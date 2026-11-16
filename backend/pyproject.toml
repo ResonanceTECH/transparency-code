@@ -1,0 +1,43 @@
+[project]
+name = "resonance-backend"
+version = "0.1.0"
+description = "Резонанс — backend API прототипа проверки сведений (FastAPI + PostgreSQL)"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115,<0.120",
+    "uvicorn[standard]>=0.30,<0.33",
+    "sqlalchemy[asyncio]>=2.0,<2.1",
+    "asyncpg>=0.29,<0.31",
+    "alembic>=1.13,<1.15",
+    "pydantic>=2.7,<3",
+    "pydantic-settings>=2.3,<3",
+    "python-multipart>=0.0.9,<0.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8,<9",
+    "pytest-asyncio>=0.24,<0.26",
+    "httpx>=0.27,<0.29",
+    "ruff>=0.6,<0.9",
+    "aiosqlite>=0.20,<0.22",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC", "RUF"]
