@@ -252,6 +252,8 @@ class MessageIn(BaseModel):
 
 
 class MessageOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: uuid.UUID
     author_role: str
     author_name: str
@@ -307,6 +309,8 @@ class ReviewerProfileOut(BaseModel):
 
 
 class ReviewOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: uuid.UUID
     result: ReviewResult
     basis_text: str

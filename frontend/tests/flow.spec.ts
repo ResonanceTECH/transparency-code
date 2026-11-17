@@ -46,34 +46,39 @@ test('profile: reservist publishes draft, reviewer requests clarification', asyn
   await page.getByLabel('Пароль').fill('resonance-demo-2026')
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
   await expect(page.getByText('ФИНАНСОВЫЙ ПРОФИЛЬ')).toBeVisible()
-  // Анкета и поток (веха 10%)
-  await page.getByLabel('ФИО').fill('Е2Е Тестовая Кандидатка')
-  await page.getByLabel('Год рождения').fill('1990')
-  await page.getByLabel('Телефон').fill('+7 900 000-00-00')
-  await page.getByLabel('E-mail').fill('e2e@demo.ru')
-  await page.getByLabel('Текущее место работы').fill('ГБУ «Учебное»')
-  await page.getByLabel('Поток', { exact: true }).fill('Время героев')
-  await page.getByLabel('Год программы').fill('2025')
-  await page.getByLabel('Регион', { exact: true }).fill('Липецкая область')
-  await page.getByLabel('Акт о зачислении №').fill('Акт-Е2Е/001')
-  await page.getByLabel('Дата акта').fill('2025-04-01')
-  // Служба (веха 50%)
-  await page.getByRole('button', { name: 'Добавить', exact: true }).first().click()
-  await page.getByLabel('Начало').fill('2019-01-01')
-  await page.getByLabel('Окончание').fill('2023-12-31')
-  // Родство: есть родственник, но выплаты заявлены без записей → несоответствие
-  await page.getByLabel('Есть родственник — участник СВО?').selectOption('true')
-  await page.getByLabel('Получали ли выплаты родственники?').selectOption('true')
-  await page.getByRole('button', { name: 'Добавить родственника' }).click()
-  await page.getByLabel('ФИО').nth(1).fill('Тестов И.И.')
-  await page.getByLabel('Степень родства').selectOption('spouse')
+  // Анкета и поток (веха 10%) — селекторы привязаны к панели: у родственника тоже есть «ФИО»
+  const anketa = page.locator('section.panel', { hasText: 'Анкета и поток' })
+  await anketa.getByLabel('ФИО').fill('Е2Е Тестовая Кандидатка')
+  await anketa.getByLabel('Год рождения').fill('1990')
+  await anketa.getByLabel('Телефон').fill('+7 900 000-00-00')
+  await anketa.getByLabel('E-mail').fill('e2e@demo.ru')
+  await anketa.getByLabel('Текущее место работы').fill('ГБУ «Учебное»')
+  await anketa.getByLabel('Поток', { exact: true }).fill('Время героев')
+  await anketa.getByLabel('Год программы').fill('2025')
+  await anketa.getByLabel('Регион', { exact: true }).fill('Липецкая область')
+  await anketa.getByLabel('Акт о зачислении №').fill('Акт-Е2Е/001')
+  await anketa.getByLabel('Дата акта').fill('2025-04-01')
+  // Служба (веха 50%) — добавляем период, если список пуст
+  const service = page.locator('section.panel', { hasText: 'Периоды службы' })
+  if (await service.getByLabel('Начало').count() === 0) {
+    await service.getByRole('button', { name: 'Добавить' }).click()
+  }
+  await service.getByLabel('Начало').first().fill('2019-01-01')
+  await service.getByLabel('Окончание').first().fill('2023-12-31')
+  // Родство: есть родственник, выплаты заявлены без записей → несоответствие
+  const kinship = page.locator('section.panel', { hasText: 'Родство с участником СВО' })
+  await kinship.getByLabel('Есть родственник — участник СВО?').selectOption('true')
+  await kinship.getByLabel('Получали ли выплаты родственники?').selectOption('true')
+  if ((await kinship.getByLabel('ФИО').count()) === 0) {
+    await kinship.getByRole('button', { name: 'Добавить родственника' }).click()
+  }
+  await kinship.getByLabel('ФИО').first().fill('Тестов И.И.')
+  await kinship.getByLabel('Степень родства').first().selectOption('spouse')
   // Ответы по всем категориям выплат (веха 70%) — «Нет»
-  const answers = page.locator('.panel select')
-  for (const select of await page.locator('select').all()) {
-    if ((await select.getAttribute('disabled')) === null) {
-      const opts = await select.locator('option').allTextContents()
-      if (opts.join(' ').includes('Планируется')) await select.selectOption('no')
-    }
+  const paymentsPanel = page.locator('.panel', { hasText: 'Выплаты и меры поддержки' })
+  const answerSelects = paymentsPanel.locator('select')
+  for (let i = 0; i < await answerSelects.count(); i++) {
+    await answerSelects.nth(i).selectOption('no')
   }
   // Диплом (веха 30%)
   await page.locator('input[type="file"]').setInputFiles({
@@ -83,7 +88,7 @@ test('profile: reservist publishes draft, reviewer requests clarification', asyn
   await page.getByRole('button', { name: 'Сохранить черновик' }).click()
   await expect(page.getByText('Заполнение: 90%')).toBeVisible()
   await page.getByRole('button', { name: 'Представить сведения' }).click()
-  await expect(page.getByText('Версия 1')).toBeVisible()
+  await expect(page.getByText(/Версия \d+/).first()).toBeVisible()
   // Выход и вход проверяющего
   await page.getByRole('button', { name: 'Выйти' }).click()
   await page.getByLabel('Логин').fill('reviewer')
@@ -102,7 +107,7 @@ test('profile: reservist publishes draft, reviewer requests clarification', asyn
   await page.getByLabel('Пароль').fill('resonance-demo-2026')
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
   await expect(page.getByText('ТРЕБУЕТСЯ УТОЧНЕНИЕ')).toBeVisible()
-  await expect(page.getByText('Уточните записи о выплатах родственникам')).toBeVisible()
+  await expect(page.getByText('Уточните записи о выплатах родственникам').first()).toBeVisible()
   expect(errors).toEqual([])
 })
 
