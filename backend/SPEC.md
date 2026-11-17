@@ -73,8 +73,8 @@ transparency-code/
 
 Модель — одна или несколько учётных записей специалистов; клиент рассчитан на cookie-сессию (`credentials: 'same-origin'`).
 
-- `POST /api/auth/login` `{username, password}` → `200 {"username": "..."}` + `Set-Cookie: session=<token>; HttpOnly; SameSite=Lax; Path=/; Secure(за TLS-прокси)`. При неверных реквизитах — `401 {"detail": "Неверный логин или пароль"}`.
-- `GET /api/auth/me` → `200 {"username": "..."}` при валидной сессии, иначе `401 {"detail": "Требуется вход"}`. Клиент вызывает при старте; `401` → экран логина.
+- `POST /api/auth/login` `{username, password}` → `200 {"username", "display_name", "role"}` + `Set-Cookie: session=<token>; HttpOnly; SameSite=Lax; Path=/; Secure(за TLS-прокси)`. При неверных реквизитах — `401 {"detail": "Неверный логин или пароль"}`. `role` — `specialist | reservist | reviewer`, клиент строит рабочий контур по роли (этап 2).
+- `GET /api/auth/me` → `200 {"username", "display_name", "role"}` при валидной сессии, иначе `401 {"detail": "Требуется вход"}`. Клиент вызывает при старте; `401` → экран логина.
 - `POST /api/auth/logout` → `200 {}` + очистка cookie/сессии в БД.
 - Пароли — argon2id или bcrypt; в БД только хэш.
 - Сессии — серверная таблица `sessions` (токен, `user_id`, `created_at`, `expires_at`) с TTL (например, 12 ч) и продлением при активности. Токен — `secrets.token_urlsafe(32)`, в cookie только токен.
@@ -242,8 +242,8 @@ transparency-code/
 | # | Метод | Путь | Ответ |
 |---|---|---|---|
 | 1 | GET | `/api/health` | `{status}` |
-| 2 | POST | `/api/auth/login` | `{username}` + cookie |
-| 3 | GET | `/api/auth/me` | `{username}` |
+| 2 | POST | `/api/auth/login` | `{username, display_name, role}` + cookie |
+| 3 | GET | `/api/auth/me` | `{username, display_name, role}` |
 | 4 | POST | `/api/auth/logout` | `{}` |
 | 5 | GET | `/api/cases` | `CaseSummary[]` |
 | 6 | POST | `/api/cases` | `CaseSummary` |
