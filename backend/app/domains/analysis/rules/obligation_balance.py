@@ -5,6 +5,8 @@
 заявленным `obligation_balance` того же объекта.
 """
 
+from decimal import Decimal
+
 from app.domains.analysis.rules.base import CandidateSignal, RuleContext, num, rub, sorted_facts
 
 FIELD_INITIAL = "obligation_initial"
@@ -12,8 +14,8 @@ FIELD_PAYMENT = "obligation_payment"
 FIELD_BALANCE = "obligation_balance"
 
 
-def _sum(facts: list[dict]) -> "object":
-    total = num("0")
+def _sum(facts: list[dict]) -> Decimal:
+    total = Decimal(0)
     for fact in facts:
         value = num(fact.get("value"))
         if value is not None:

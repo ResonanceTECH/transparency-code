@@ -15,6 +15,7 @@ from typing import Any
 # Серверный словарь подписей полей (SPEC.md §7.4); расширяется с реестром правил.
 FIELD_LABELS = {
     "sale_amount": "Доход от продажи в справке",
+    "obligation_initial": "Сумма обязательства по договору",
     "obligation_balance": "Остаток обязательства",
     "obligation_payment": "Платёж по обязательству",
     "income_declared": "Заявленный доход",
