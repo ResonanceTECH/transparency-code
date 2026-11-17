@@ -106,8 +106,26 @@ test('profile: reservist publishes draft, reviewer requests clarification', asyn
   await page.getByLabel('Логин').fill('reservist')
   await page.getByLabel('Пароль').fill('resonance-demo-2026')
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
-  await expect(page.getByText('ТРЕБУЕТСЯ УТОЧНЕНИЕ')).toBeVisible()
+  await expect(page.getByText('ТРЕБУЕТСЯ УТОЧНЕНИЕ').first()).toBeVisible()
   await expect(page.getByText('Уточните записи о выплатах родственникам').first()).toBeVisible()
+  // Причина уточнения визуально выделена в шапке профиля
+  await expect(page.getByText('Требуется уточнение.').first()).toBeVisible()
+  // Резервист правит черновик и представляет новую версию
+  await anketa.getByLabel('Телефон').fill('+7 900 111-11-11')
+  await page.getByRole('button', { name: 'Сохранить черновик' }).click()
+  await page.getByRole('button', { name: 'Представить сведения' }).click()
+  await expect(page.getByText(/Изменено в версии \d+/).first()).toBeVisible()
+  await expect(page.getByText('person.phone').first()).toBeVisible()
+  // Проверяющий видит сравнение версий и переключается между ними
+  await page.getByRole('button', { name: 'Выйти' }).click()
+  await page.getByLabel('Логин').fill('reviewer')
+  await page.getByLabel('Пароль').fill('resonance-demo-2026')
+  await page.getByRole('button', { name: 'Войти', exact: true }).click()
+  await page.getByText('Е2Е Тестовая Кандидатка').click()
+  await expect(page.getByText(/Что изменилось: версия \d+ → \d+/)).toBeVisible()
+  await expect(page.getByText('person.phone').first()).toBeVisible()
+  await page.getByLabel('Выбор версии').selectOption({ index: 0 })
+  await expect(page.getByText(/ВЕРСИЯ \d+/).first()).toBeVisible()
   expect(errors).toEqual([])
 })
 

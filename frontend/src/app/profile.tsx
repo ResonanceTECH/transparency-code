@@ -50,6 +50,7 @@ type Draft = {
 }
 type Completeness = { progress: number; milestones: { percent: number; title: string; done: boolean }[]; missing: string[]; can_submit: boolean }
 type Version = { id: string; number: number; status: string; progress: number; created_at: string }
+type Diff = { version_from: number; version_to: number; changed: number; entries: { path: string; before: unknown; after: unknown }[] }
 type Signal = { id: string; rule_id: string; title: string; explanation: string; action: string; status: string; created_at: string }
 type Message = { id: string; author_role: string; author_name: string; kind: string; text: string; created_at: string }
 type Contact = { id: string; name: string; responsibility: string; phone: string; email: string }
@@ -97,6 +98,7 @@ const WORK_STATUS: [string, string][] = [
 ]
 const EDITABLE = ['draft', 'clarification']
 const status = (s: string) => STATUS_RU[s] || s
+const fmtValue = (v: unknown) => (v === null || v === undefined ? '—' : typeof v === 'object' ? JSON.stringify(v) : String(v))
 
 function downloadJson(data: unknown, name: string) {
   const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }))
@@ -147,6 +149,7 @@ function ReservistView({ toast }: { toast: (m: string) => void }) {
   const [error, setError] = useState('')
   const [reply, setReply] = useState('')
   const [docKind, setDocKind] = useState('diploma')
+  const [diff, setDiff] = useState<Diff | null>(null)
 
   const editable = !!draft && EDITABLE.includes(draft.status)
   const load = async () => {
@@ -160,6 +163,9 @@ function ReservistView({ toast }: { toast: (m: string) => void }) {
       api<AuditEvent[]>('/profile/audit')
     ])
     setDraft(d); setComp(c); setVersions(v); setSignals(s); setMessages(ms); setContacts(ct); setAudit(au)
+    setDiff(v.length >= 2
+      ? await api<Diff>(`/profile/versions/${v[v.length - 2].number}/diff/${v[v.length - 1].number}`).catch(() => null)
+      : null)
   }
   useEffect(() => { load().catch((e) => setError(e.message)) }, [])
 
@@ -223,9 +229,16 @@ function ReservistView({ toast }: { toast: (m: string) => void }) {
     activities: draft.activities.map(({ id: _id, ...r }) => r)
   })
 
+  const lastQuestion = [...messages].reverse().find((m) => m.kind === 'question')
+
   return (
     <>
       {error && <Notice warning>{error}</Notice>}
+      {draft.status === 'clarification' && (
+        <Notice warning>
+          <b>Требуется уточнение.</b> {lastQuestion?.text || 'Проверяющий запросил уточнения — подробности в переписке.'}
+        </Notice>
+      )}
       <div className="page-heading">
         <div>
           <div className="eyebrow">ФИНАНСОВЫЙ ПРОФИЛЬ · {status(draft.status).toUpperCase()}</div>
@@ -453,6 +466,17 @@ function ReservistView({ toast }: { toast: (m: string) => void }) {
               <span style={{ flex: 1 }}>Версия {v.number} · {status(v.status)} · {dateText(v.created_at)}</span>
             </div>
           ))}
+          {diff && !!diff.changed && (
+            <>
+              <p className="muted" style={{ marginTop: 10 }}>Изменено в версии {diff.version_to} относительно {diff.version_from} — {diff.changed} полей:</p>
+              {diff.entries.map((e) => (
+                <div key={e.path} className="document">
+                  <span style={{ flex: 1 }}><code>{e.path}</code></span>
+                  <span className="muted">{fmtValue(e.before)} → {fmtValue(e.after)}</span>
+                </div>
+              ))}
+            </>
+          )}
         </Panel>
       )}
 
@@ -522,6 +546,8 @@ function ReviewerView({ toast }: { toast: (m: string) => void }) {
   const [filter, setFilter] = useState('')
   const [card, setCard] = useState<ReviewerProfile | null>(null)
   const [audit, setAudit] = useState<AuditEvent[]>([])
+  const [cardVersions, setCardVersions] = useState<Version[]>([])
+  const [diff, setDiff] = useState<Diff | null>(null)
   const [error, setError] = useState('')
   const [comment, setComment] = useState('')
   const [basis, setBasis] = useState('')
@@ -529,9 +555,14 @@ function ReviewerView({ toast }: { toast: (m: string) => void }) {
   const [signalComments, setSignalComments] = useState<Record<string, string>>({})
 
   const loadQueue = async () => setQueue(await api<QueueItem[]>(`/reviewer/queue${filter ? `?status=${filter}` : ''}`))
-  const loadCard = async (id: string) => {
-    setCard(await api<ReviewerProfile>(`/reviewer/profiles/${id}`))
-    setAudit(await api<AuditEvent[]>(`/reviewer/profiles/${id}/audit`))
+  const loadCard = async (id: string, version?: number) => {
+    setCard(await api<ReviewerProfile>(`/reviewer/profiles/${id}${version ? `?version=${version}` : ''}`))
+    const [vs, d, au] = await Promise.all([
+      api<Version[]>(`/reviewer/profiles/${id}/versions`),
+      api<Diff>(`/reviewer/profiles/${id}/diff`).catch(() => null),
+      api<AuditEvent[]>(`/reviewer/profiles/${id}/audit`)
+    ])
+    setCardVersions(vs); setDiff(d); setAudit(au)
   }
   useEffect(() => { loadQueue().catch((e) => setError(e.message)) }, [filter])
   const run = (fn: () => Promise<void>, ok = '') =>
@@ -560,6 +591,12 @@ function ReviewerView({ toast }: { toast: (m: string) => void }) {
             <p>{snap.program?.regional_program || snap.program?.flow} · назначен: {card.assigned_reviewer || '—'}</p>
           </div>
           <div className="actions">
+            {cardVersions.length > 1 && (
+              <select value={card.version.number} aria-label="Выбор версии"
+                onChange={(e) => loadCard(card.profile_id, +e.target.value).catch((err) => setError(err.message))}>
+                {cardVersions.map((v) => <option key={v.id} value={v.number}>Версия {v.number} · {status(v.status)}</option>)}
+              </select>
+            )}
             <button className="secondary" onClick={() => setCard(null)}><X size={16} /> К очереди</button>
             <button className="secondary" onClick={() => run(async () => { const data = await api(`/reviewer/profiles/${card.profile_id}/export`); downloadJson(data, `profile-${card.version.number}.json`) })}><Download size={16} /> JSON</button>
           </div>
@@ -590,6 +627,17 @@ function ReviewerView({ toast }: { toast: (m: string) => void }) {
             </div>
           ))}
         </Panel>
+
+        {diff && !!diff.changed && cardVersions.length > 1 && (
+          <Panel title={`Что изменилось: версия ${diff.version_from} → ${diff.version_to}`}>
+            {diff.entries.map((e) => (
+              <div key={e.path} className="document">
+                <span style={{ flex: 1 }}><code>{e.path}</code></span>
+                <span className="muted">{fmtValue(e.before)} → {fmtValue(e.after)}</span>
+              </div>
+            ))}
+          </Panel>
+        )}
 
         <Panel title="Сведения о доходах">
           <div className="info-grid">
