@@ -97,8 +97,14 @@ def add_audit(db: AsyncSession, profile: Profile, user: User | None,
 # ---------- черновик ----------
 
 
-def apply_draft(db: AsyncSession, profile: Profile, data: DraftIn) -> None:
-    """Полная замена черновика: скаляры профиля + все дочерние коллекции."""
+async def apply_draft(db: AsyncSession, profile: Profile, data: DraftIn) -> None:
+    """Полная замена черновика: скаляры профиля + все дочерние коллекции.
+
+    Блоки выплат обновляются на месте по категории — у них UNIQUE
+    (profile_id, category), поэтому replace-через-сирот бьётся о порядок
+    insert/delete в одном flush. Остальные коллекции заменяются целиком
+    через cascade delete-orphan (ограничений у них нет).
+    """
     p, pr = data.person, data.program
     profile.full_name, profile.birth_year = p.full_name, p.birth_year
     profile.phone, profile.email, profile.current_workplace = p.phone, p.email, p.current_workplace
@@ -123,18 +129,20 @@ def apply_draft(db: AsyncSession, profile: Profile, data: DraftIn) -> None:
                         participant_status=r.participant_status, sort=i)
         for i, r in enumerate(data.kinship.relatives)
     ]
-    blocks = {b.category: b for b in data.payments}
-    profile.payment_blocks = []
+    incoming = {b.category: b for b in data.payments}
+    existing = {b.category: b for b in profile.payment_blocks}
     for i, cat in enumerate(PAYMENT_CATEGORIES):
-        src = blocks.get(cat)
-        block = PaymentBlock(profile_id=profile.id, category=cat,
-                             answer=src.answer if src else None, sort=i)
-        if src:
-            block.records = [
-                PaymentRecord(profile_id=profile.id, sort=j, **r.model_dump())
-                for j, r in enumerate(src.records)
-            ]
-        profile.payment_blocks.append(block)
+        src = incoming.get(cat)
+        block = existing.get(cat)
+        if block is None:
+            block = PaymentBlock(profile_id=profile.id, category=cat, sort=i)
+            profile.payment_blocks.append(block)
+        block.answer = src.answer if src else None
+        block.sort = i
+        block.records = [
+            PaymentRecord(profile_id=profile.id, sort=j, **r.model_dump())
+            for j, r in enumerate(src.records)
+        ] if src else []
     profile.activities = [
         Activity(organization=a.organization, kind=a.kind, engagement=a.engagement,
                  period_from=a.period_from, period_to=a.period_to,
