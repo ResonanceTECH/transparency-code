@@ -163,3 +163,13 @@ cp .env.example .env
 - Проверено: `ruff` чист, `pytest` **27/27**, OpenAPI — 10 путей, все новые эндпоинты с тегом `documents`; uvicorn + живой PostgreSQL E2E: login → case `PR-2025-0012` → upload `up.json` → `ready`+2 факта → PATCH → `confirm-facts` → download 200 → лента событий полная.
 
 **Далее:** `POST /cases/{id}/demo` (trade_in/apartment/clean) → analysis (rules + runs + signals) → decisions → report.
+
+### Итерация 9 — SPEC §10.8: финансовая сводка проверяющего (17.11.2026)
+
+- `profile/services.py`: `income_summary(snapshot)` — агрегат «Сведения о доходах» над слепком `ProfileVersion.snapshot` (иммутабелен, совпадает с показанной версией): суммируются только записи `form="monetary"`; категория `non_monetary` и форма `in_kind` исключены; `Decimal`-арифметика, итог `{currency:"RUB", total, records, by_category[]}`.
+- `profile/schemas.py`: `IncomeSummaryOut` + `IncomeCategoryTotal`; поле `income_summary` добавлено в `ReviewerProfileOut` — сводка видна только проверяющему в карточке профиля.
+- `profile/api.py`: `GET /reviewer/profiles/{id}` заполняет `income_summary` из `version.snapshot`.
+- `tests/test_profile.py`: `test_reviewer_income_summary` — черновик с monetary/in_kind/non_monetary записями → submit → проверка итога `200000.00`, `records=3`, разбивка по категориям; in_kind (999) и non_monetary (777) не входят.
+- Проверено: `ruff` чист, `pytest` **58/58**; `/openapi.json` — 35 путей, все 19 эндпоинтов §10.7 (`profile`/`reviewer`/`reference`), `IncomeSummaryOut` в схемах.
+
+**Контракт этапа 2 (SPEC §10) реализован полностью.** Открытый фронт работ — итерация 10: подключение `frontend/src/profile` к API (сейчас макет в памяти).
