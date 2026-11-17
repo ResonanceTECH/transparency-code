@@ -190,7 +190,7 @@ async def put_draft(data: DraftIn, user: User = Depends(require_reservist),
     if profile.status not in svc.EDITABLE:
         raise HTTPException(status.HTTP_409_CONFLICT,
                             "Черновик недоступен для редактирования в текущем статусе")
-    svc.apply_draft(db, profile, data)
+    await svc.apply_draft(db, profile, data)
     progress, _m, _missing = svc.compute_completeness(profile)
     profile.progress = progress
     svc.add_audit(db, profile, user, "Черновик обновлён", AuditScope.PRIVATE)
