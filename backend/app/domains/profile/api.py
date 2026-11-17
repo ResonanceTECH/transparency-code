@@ -13,6 +13,7 @@
 
 import hashlib
 import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
@@ -555,6 +556,50 @@ async def reviewer_audit(profile_id: uuid.UUID,
                          db: AsyncSession = Depends(get_db)):
     profile = await _get_visible(db, profile_id)
     return await svc.profile_audit(db, profile.id, AuditScope.SUBMITTED)
+
+
+@router.get(
+    "/reviewer/profiles/{profile_id}/export", tags=["reviewer"],
+    summary="Выгрузка результата рассмотрения",
+    description="JSON: метаданные профиля, последняя версия, несоответствия с "
+                "решениями, итоговое решение и ограничения прототипа (SPEC §10.8).",
+    responses={k: v for k, v in _ERRORS.items() if k in (401, 403, 404)},
+)
+async def export_profile(profile_id: uuid.UUID,
+                         user: User = Depends(require_reviewer),
+                         db: AsyncSession = Depends(get_db)):
+    profile = await _get_visible(db, profile_id)
+    version = profile.versions[-1]
+    signals = await svc.profile_signals(db, profile.id, version.id)
+    reviews = await svc.profile_reviews(db, profile.id)
+    return {
+        "exported_at": datetime.now(UTC).isoformat(),
+        "profile": {"full_name": profile.full_name, "status": profile.status.value,
+                    "program": profile.regional_program or profile.flow},
+        "version": {"number": version.number, "created_at": version.created_at,
+                    "snapshot": version.snapshot},
+        "signals": [
+            {"rule_id": s.rule_id, "title": s.title, "status": s.status.value,
+             "explanation": s.explanation,
+             "decisions": [{"status": d.status.value, "comment": d.comment,
+                            "author": d.author_name,
+                            "created_at": d.created_at.isoformat()}
+                           for d in s.decisions]}
+            for s in signals
+        ],
+        "reviews": [
+            {"result": r.result.value, "basis": r.basis_text,
+             "comment": r.comment, "author": r.author_name,
+             "created_at": r.created_at.isoformat()}
+            for r in reviews
+        ],
+        "limitations": [
+            "Несоответствия — не выводы о нарушениях; решения принимает "
+            "уполномоченный человек.",
+            "Проверки выполнены только над представленными синтетическими "
+            "сведениями; внешние реестры не использовались.",
+        ],
+    }
 
 
 # ---------- справочник ----------
