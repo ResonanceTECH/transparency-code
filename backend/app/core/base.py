@@ -12,7 +12,7 @@ _CONVENTION = {
 
 
 class Base(DeclarativeBase):
-    """Базовый класс ORM-моделей (см. SPEC.md §6)."""
+    """Shared kernel: базовый класс ORM-моделей всех доменов (см. SPEC.md §6)."""
 
     metadata = MetaData(naming_convention=_CONVENTION)
 

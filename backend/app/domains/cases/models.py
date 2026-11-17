@@ -1,3 +1,4 @@
+import enum
 import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -5,13 +6,19 @@ from typing import TYPE_CHECKING
 from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base
-from app.models.enums import Basis
+from app.core.base import Base
 
 if TYPE_CHECKING:
-    from app.models.analysis import AnalysisRun
-    from app.models.document import Document, Fact
-    from app.models.user import User
+    from app.domains.analysis.models import AnalysisRun
+    from app.domains.documents.models import Document, Fact
+    from app.domains.identity.models import User
+
+
+class Basis(str, enum.Enum):
+    """Контекст проверки (SPEC.md §5.3)."""
+
+    CANDIDATE = "candidate"
+    EXPENSE_REVIEW = "expense_review"
 
 
 class Case(Base):

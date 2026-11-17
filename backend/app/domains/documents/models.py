@@ -1,3 +1,4 @@
+import enum
 import uuid
 from datetime import date, datetime
 from typing import TYPE_CHECKING
@@ -5,11 +6,17 @@ from typing import TYPE_CHECKING
 from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Index, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base
-from app.models.enums import DocumentStatus
+from app.core.base import Base
 
 if TYPE_CHECKING:
-    from app.models.case import Case
+    from app.domains.cases.models import Case
+
+
+class DocumentStatus(str, enum.Enum):
+    RECEIVED = "received"
+    PROCESSING = "processing"
+    READY = "ready"
+    FAILED = "failed"
 
 
 class Document(Base):
@@ -42,7 +49,9 @@ class Fact(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     case_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("cases.id", ondelete="CASCADE"), index=True)
-    document_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("documents.id", ondelete="SET NULL"), index=True)
+    document_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("documents.id", ondelete="SET NULL"), index=True
+    )
     field: Mapped[str] = mapped_column(String(120))
     label: Mapped[str] = mapped_column(String(300), default="")
     value: Mapped[str] = mapped_column(Text, default="")

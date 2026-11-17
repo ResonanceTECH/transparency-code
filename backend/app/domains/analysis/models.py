@@ -1,3 +1,4 @@
+import enum
 import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -5,12 +6,24 @@ from typing import TYPE_CHECKING
 from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, JSONType
-from app.models.enums import DecisionStatus, SignalStatus
+from app.core.base import Base, JSONType
 
 if TYPE_CHECKING:
-    from app.models.case import Case
-    from app.models.document import Fact
+    from app.domains.cases.models import Case
+    from app.domains.documents.models import Fact
+
+
+class SignalStatus(str, enum.Enum):
+    UNREVIEWED = "unreviewed"
+    CLARIFICATION = "clarification"
+    RESOLVED = "resolved"
+    FURTHER_REVIEW = "further_review"
+
+
+class DecisionStatus(str, enum.Enum):
+    CLARIFICATION = "clarification"
+    RESOLVED = "resolved"
+    FURTHER_REVIEW = "further_review"
 
 
 class AnalysisRun(Base):
@@ -25,7 +38,9 @@ class AnalysisRun(Base):
     input_hash: Mapped[str] = mapped_column(String(64), default="")
     warnings: Mapped[list] = mapped_column(JSONType, default=list)
     author: Mapped[str] = mapped_column(String(64), default="")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
 
     case: Mapped["Case"] = relationship(back_populates="runs")
     signals: Mapped[list["Signal"]] = relationship(
