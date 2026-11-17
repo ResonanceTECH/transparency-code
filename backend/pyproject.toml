@@ -41,3 +41,5 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "ASYNC", "RUF"]
+# Докстринги проекта на русском — неоднозначные юникод-символы ожидаемы.
+ignore = ["RUF001", "RUF002", "RUF003"]
