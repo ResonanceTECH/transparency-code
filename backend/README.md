@@ -133,6 +133,19 @@ cp .env.example .env
 
 **Контракт этапа 1 реализован полностью.** Далее — этап 2 (SPEC §10): домен финансового профиля (`app/domains/profile/`), начиная с моделей + черновика резервиста.
 
+### Итерация 8 — домен `profile`: двухролевый контур финансового профиля (17.11.2026)
+
+- `app/domains/profile/` — новый bounded context (SPEC §10): `models.py` (12 таблиц), `schemas.py`, `services.py`, `rules.py`, `api.py`; миграция `e14c17090890`.
+- **Модель**: `profiles` (анкета, поток, акт, статус-машина `draft → submitted → accepted/clarification → resubmitted → completed/removed`), `service_periods`, `kinship_relatives`, `payment_blocks` + `payment_records` (10 категорий, UNIQUE по категории, `extra` JSONB для редких реквизитов), `activities`, `profile_documents`, `profile_versions` (неизменный JSONB-слепок агрегата), `profile_signals` + `profile_signal_decisions` (append-only), `profile_messages`, `profile_reviews`, `profile_audit` (scope `private`/`submitted`), `reviewer_assignments`, `reference_contacts`.
+- **Резервист** (`role=reservist`): `GET/PUT /api/profile` (полная замена черновика, `409` вне draft/clarification), `GET /profile/completeness` (вехи 10/30/50/70/90 + `missing[]` + `can_submit`), `POST/DELETE /profile/documents` (kind: diploma/reserve_act/order/contract/act/letter/other; лимиты §8; дедуп sha256), `POST /profile/submit` (→ слепок версии + проверки + auto-assign), `GET /profile/versions[/{n}]`, `GET /profile/signals`, `GET/POST /profile/messages`, `GET /profile/audit`.
+- **Проверяющий** (`role=reviewer|specialist`): `GET /reviewer/queue?status=` (только опубликованные — черновики невидимы), `GET /reviewer/profiles/{id}` (последняя версия + сигналы + переписка + решения), `POST /reviewer/profiles/{id}/decision` (`action: accept|clarification|complete|remove`; `remove` требует `basis`; `409` после финала), `POST /reviewer/signals/{id}/decision` (reviewed|clarification|dismissed), `GET/POST …/messages`, `GET …/audit` (только submitted-scope), `GET …/export` (JSON результата с ограничениями).
+- **Детерминированные проверки** `rules.py` — 6 правил над снапшотом версии: `period-order`, `relative-without-kinship`, `kinship-payments-missing`, `housing-kind-required`, `document-basis-required`, `activity-outside-service`; реестр — `GET /api/reference/rules`.
+- **identity**: сид demo-аккаунтов `reservist` и `reviewer` (тот же учебный пароль, `ALLOW_DEMO_LOGIN`); auto-assign профиля на первого проверяющего при публикации.
+- `tests/test_profile.py` — 18 контракт-тестов: ролевые границы (401/403), вехи прогресса, полная замена черновика, публикация + слепки версий, невидимость черновика, жизненный цикл несоответствий и решений, переписка, аудит по scope, дедуп документов, экспорт.
+- **Проверено:** `ruff` чист, `pytest` **55/55**; живой E2E через curl: reservist → черновик 90% → submit v1 → сигнал `kinship-payments-missing` → clarification → вопрос резервисту → правка → resubmit v2 → complete → аудит; docker-стек пересобран, миграция применена, контур работает через nginx `:8080`; `/openapi.json` — 33 пути, теги `profile`/`reviewer`/`reference`, 64 схемы.
+
+**Далее (итерация 9):** подключение `frontend/src/profile` (`/prototype`) к API — сейчас экран полностью в памяти; UI-правки из «Интерфейс» (круглая шкала прогресса, «несоответствия», контакты операторов из `reference_contacts`).
+
 ### Итерация 7 — SPEC v1.2 + documents-домен (17.11.2026)
 
 **SPEC.md → v1.2**: контракты извлечения зафиксированы — JSON `{synthetic:true, facts:[…]}`, XLSX с RU-заголовками, PDF/DOCX маркерные строки `field=x; value=y; …`; неподдержанный шаблон → `status=failed` + `error='Шаблон документа не распознан'`; `FIELD_LABELS` — серверный словарь подписей; дедупликация по sha256 внутри дела; заголовок OpenAPI → `Резонанс · синтетический прототип` (e2e `flow.spec.ts` проверяет title).
