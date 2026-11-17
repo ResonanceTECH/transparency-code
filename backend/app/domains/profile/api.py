@@ -195,7 +195,9 @@ async def put_draft(data: DraftIn, user: User = Depends(require_reservist),
     profile.progress = progress
     svc.add_audit(db, profile, user, "Черновик обновлён", AuditScope.PRIVATE)
     await db.commit()
-    await db.refresh(profile)
+    # Повторный eager-запрос: свежий updated_at + загруженные коллекции
+    # (refresh выгружал бы relationships → lazy-load вне контекста).
+    profile = await svc.get_or_create_profile(db, user)
     return _draft_out(profile)
 
 
