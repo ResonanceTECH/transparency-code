@@ -39,6 +39,15 @@ import { labels } from './format'
 import { Panel, Notice } from './ui'
 import './styles.css'
 
+function LogoMark({ size = 40 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 40 40" aria-hidden="true">
+      <rect width="40" height="40" rx="10" fill="#0d4cd3" />
+      <path d="M11.5 10.5 L29.5 17 L23 20 L29.5 23 L11.5 29.5 Z" fill="#fff" />
+    </svg>
+  )
+}
+
 export default function App() {
   const m = useAppModel()
   const {
@@ -128,55 +137,69 @@ export default function App() {
   if (!user)
     return (
       <main className="login">
-        <div className="login-brand">
-          <Diamond size={36} />
-          <h1>РЕЗОНАНС</h1>
-          <p>Проверка сведений · демонстрационный прототип</p>
-        </div>
-        <form
-          className="panel login-form"
-          onSubmit={(e) => {
-            e.preventDefault()
-            task(async () => {
-              const result = await api<{ username: string }>('/auth/login', {
-                method: 'POST',
-                body: JSON.stringify({ username: loginName, password: loginPassword })
+        <header className="login-topbar">
+          <div className="login-logo">
+            <LogoMark />
+            <span className="login-logo-text">
+              <b>Резонанс</b>
+              <small>Проверка сведений</small>
+            </span>
+          </div>
+          <span className="login-tag">Демонстрационный прототип</span>
+        </header>
+        <div className="login-content">
+          <form
+            className="login-form"
+            onSubmit={(e) => {
+              e.preventDefault()
+              task(async () => {
+                const result = await api<{ username: string }>('/auth/login', {
+                  method: 'POST',
+                  body: JSON.stringify({ username: loginName, password: loginPassword })
+                })
+                setUser(result.username)
               })
-              setUser(result.username)
-            })
-          }}
-        >
-          <h2>Рабочее пространство</h2>
-          <p>Только синтетические данные. Юридически значимые решения система не принимает.</p>
-          <label>
-            Логин
-            <input
-              autoComplete="username"
-              value={loginName}
-              onChange={(e) => setLoginName(e.target.value)}
-              required
-            />
-          </label>
-          <label>
-            Пароль
-            <input
-              type="password"
-              autoComplete="current-password"
-              value={loginPassword}
-              onChange={(e) => setLoginPassword(e.target.value)}
-              required
-            />
-          </label>
-          {error && <Notice warning>{error}</Notice>}
-          <button disabled={busy} type="submit">
-            {busy ? 'Входим…' : 'Войти'} <ArrowRight size={17} />
-          </button>
-          <small>
-            Локальный аккаунт по умолчанию: demo / resonance-demo-2026.
-            <br />
-            Если меняли .env, используйте свои реквизиты.
-          </small>
-        </form>
+            }}
+          >
+            <h1>Вход в систему</h1>
+            <p>
+              Рабочее пространство специалиста по проверке сведений. Только синтетические данные —
+              юридически значимые решения система не принимает.
+            </p>
+            <label>
+              Логин
+              <input
+                autoComplete="username"
+                placeholder="Введите логин"
+                value={loginName}
+                onChange={(e) => setLoginName(e.target.value)}
+                required
+              />
+            </label>
+            <label>
+              Пароль
+              <input
+                type="password"
+                autoComplete="current-password"
+                placeholder="Введите пароль"
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                required
+              />
+            </label>
+            {error && <Notice warning>{error}</Notice>}
+            <button disabled={busy} type="submit">
+              {busy ? 'Входим…' : 'Войти'}
+            </button>
+            <Notice>
+              Локальный аккаунт по умолчанию: <b>demo / resonance-demo-2026</b>. Если меняли .env —
+              используйте свои реквизиты.
+            </Notice>
+          </form>
+          <p className="login-footnote">
+            Прототип команды «Резонанс» · все сведения вымышленные · направление № 6
+          </p>
+        </div>
       </main>
     )
 
@@ -185,11 +208,9 @@ export default function App() {
     <div className="app">
       <aside className="sidebar">
         <button className="brand" onClick={() => go('overview')}>
-          <span className="brand-icon">
-            <Diamond size={27} strokeWidth={2.5} />
-          </span>
+          <LogoMark />
           <span>
-            <b>РЕЗОНАНС</b>
+            <b>Резонанс</b>
             <small>Проверка сведений</small>
           </span>
         </button>
