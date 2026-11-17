@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import type { View, CaseSummary, CaseDetail, Fact, Rule, Signal } from './types'
 import { api, ApiError } from './api'
+import type { Me } from './profile'
 
 export function useAppModel() {
-  const [user, setUser] = useState<string | null>(null)
+  const [user, setUser] = useState<Me | null>(null)
   const [boot, setBoot] = useState(true)
   const [view, setView] = useState<View>('overview')
   const [cases, setCases] = useState<CaseSummary[]>([])
@@ -28,8 +29,8 @@ export function useAppModel() {
   const archived = !!currentRun && currentRun.id !== detail?.runs[0]?.id
 
   useEffect(() => {
-    api<{ username: string }>('/auth/me')
-      .then((r) => setUser(r.username))
+    api<Me>('/auth/me')
+      .then((r) => setUser(r))
       .catch((e) => {
         if (!(e instanceof ApiError && e.status === 401)) setError(e.message)
       })

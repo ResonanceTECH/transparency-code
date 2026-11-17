@@ -8,8 +8,8 @@
 
 ## Документация
 
-- **[SPEC.md](SPEC.md)** — полная спецификация: REST-контракт (16 эндпоинтов `/api/*` + `/api/health` + `/openapi.json`), модель данных PostgreSQL, бизнес-логика (статусы, `stale`-снапшоты, конвейер документов, движок правил, решения), безопасность, env-конфигурация, домен этапа 2 (финансовый профиль) и открытые вопросы.
-- Клиентский контракт восстановлен из `frontend/src/app/` и `frontend/tests/flow.spec.ts` — клиент является источником истины.
+- **[SPEC.md](SPEC.md)** — полная спецификация: REST-контракт (16 эндпоинтов `/api/*` + `/api/health` + `/openapi.json`), модель данных PostgreSQL, бизнес-логика (статусы, `stale`-снапшоты, конвейер документов, движок правил, решения), безопасность, env-конфигурация, детальный домен этапа 2 (финансовый профиль резервиста — по продуктовым документам команды) и открытые вопросы.
+- Клиентский контракт этапа 1 восстановлен из `frontend/src/app/` и `frontend/tests/flow.spec.ts` — клиент является источником истины. Контракт этапа 2 (SPEC §10) — из `frontend/src/profile/` и документов «Проект ролей и функций», «Роли и функции + ввод данных», «Интерфейс», «Паспорт проекта».
 
 ## Структура
 
@@ -24,10 +24,10 @@ backend/
     core/               # shared kernel: config, db, deps, base
     platform/           # health и метаданные сервиса
     domains/            # bounded contexts — см. MICROSERVICES.md
-      identity/         #   users, sessions, auth: api/schemas/services/models
-      cases/            #   дела, статусы, события
-      documents/        #   загрузка, pipeline, факты
-      analysis/         #   rules, analysis_runs, signals, decisions
+      identity/         #   users, sessions, auth: api/schemas/services/models/deps
+      cases/            #   дела, статусы, события + POST /cases/{id}/demo
+      documents/        #   загрузка, pipeline, факты, demo-комплекты
+      analysis/         #   rules/, analysis_runs, signals, decisions
       reporting/        #   сборка отчёта (без собственных таблиц)
   MICROSERVICES.md      # карта сервисов, контракты, путь выделения
   alembic/              # миграции (env.py готов; revisions — после поднятия PostgreSQL)
@@ -121,7 +121,30 @@ cp .env.example .env
 - `tests/conftest.py`: общие `demo_user`/`auth_client`; `test_cases.py` — 9 тестов (auth-гард, CRUD, нумерация, валидация 422, дефолт department, detail+события, 404, owner-изоляция); `test_auth.py` на общих фикстурах.
 - Проверено: `ruff` чист, `pytest` **18/18**, OpenAPI — теги/summary/enum'ы/коды ответов; uvicorn + живой PostgreSQL: login → create `PR-2025-0001` → list → detail → `no-store` — E2E OK.
 
-**Далее:** documents (upload/pipeline/facts) → `POST /cases/{id}/demo` → analysis (rules + runs) → signals/decisions → report → outbox-события.
+### Итерация 7 — движок анализа, demo-комплекты, отчёт: контракт этапа 1 закрыт (17.11.2026)
+
+- `app/domains/analysis/rules/` — реестр из 3 детерминированных правил (`Rule{id,title,description,evaluate(ctx)}`, чистые функции над снапшотом): `sale-income-gap` («Возможный пропуск дохода от продажи»), `obligation-balance` («Сопоставление обязательств» → «Различаются остатки обязательства»), `expense-coverage` («Расход не покрыт заявленными поступлениями»). Числа — `Decimal`, порядок фактов — по `id`.
+- `analysis/api.py`: `GET /rules` (стабильный порядок), `POST /cases/{id}/analysis-runs` (201, `input_hash` SHA-256 снапшота, `warnings` по неподтверждённым полям, сигналы с `signal_facts.fact_snapshot`-слепками, 422 на пустой/неизвестный набор правил), `POST /signals/{id}/decisions` (201; `409` — архивный запуск или stale-дело; решение меняет `signal.status`, пересчёт pending происходит при чтении).
+- `documents/demo.py`: комплекты `trade_in` (2 «документа», 5 фактов → 2 сигнала), `apartment` (расход vs источники), `clean=true` — без расхождений; `POST /cases/{id}/demo` идемпотентен по sha256 документа; `downloadable=false`.
+- `reporting/`: `GET /cases/{id}/report` — `{generated_at, case, latest_run, signals_total, pending_count, limitations[]}`; клиент скачивает как `PR-*.json`.
+- `FIELD_LABELS` дополнен `obligation_initial`; `AnalysisRun.created_at` — явный UTC-timestamp (микросекунды) для стабильного порядка runs на SQLite.
+- `tests/test_analysis.py` — 10 контракт-тестов: реестр, demo-идемпотентность/404, сигналы+evidence, детерминизм hash, валидация 422, warnings, решения (422/<5, 201, 404), блокировки 409 stale/архив, иммутабельность слепка evidence, структура отчёта.
+- **Проверено:** `ruff` чист, `pytest` **37/37**; E2E по `flow.spec.ts` вручную через curl на uvicorn и через nginx (`:8080`, docker-стек пересобран): login → дело → demo → confirm → анализ (2 сигнала) → решение → PATCH → stale → переанализ (1 сигнал) → отключение правила (0) → report; `/openapi.json` — все 16 эндпоинтов + health.
+
+**Контракт этапа 1 реализован полностью.** Далее — этап 2 (SPEC §10): домен финансового профиля (`app/domains/profile/`), начиная с моделей + черновика резервиста.
+
+### Итерация 8 — домен `profile`: двухролевый контур финансового профиля (17.11.2026)
+
+- `app/domains/profile/` — новый bounded context (SPEC §10): `models.py` (12 таблиц), `schemas.py`, `services.py`, `rules.py`, `api.py`; миграция `e14c17090890`.
+- **Модель**: `profiles` (анкета, поток, акт, статус-машина `draft → submitted → accepted/clarification → resubmitted → completed/removed`), `service_periods`, `kinship_relatives`, `payment_blocks` + `payment_records` (10 категорий, UNIQUE по категории, `extra` JSONB для редких реквизитов), `activities`, `profile_documents`, `profile_versions` (неизменный JSONB-слепок агрегата), `profile_signals` + `profile_signal_decisions` (append-only), `profile_messages`, `profile_reviews`, `profile_audit` (scope `private`/`submitted`), `reviewer_assignments`, `reference_contacts`.
+- **Резервист** (`role=reservist`): `GET/PUT /api/profile` (полная замена черновика, `409` вне draft/clarification), `GET /profile/completeness` (вехи 10/30/50/70/90 + `missing[]` + `can_submit`), `POST/DELETE /profile/documents` (kind: diploma/reserve_act/order/contract/act/letter/other; лимиты §8; дедуп sha256), `POST /profile/submit` (→ слепок версии + проверки + auto-assign), `GET /profile/versions[/{n}]`, `GET /profile/signals`, `GET/POST /profile/messages`, `GET /profile/audit`.
+- **Проверяющий** (`role=reviewer|specialist`): `GET /reviewer/queue?status=` (только опубликованные — черновики невидимы), `GET /reviewer/profiles/{id}` (последняя версия + сигналы + переписка + решения), `POST /reviewer/profiles/{id}/decision` (`action: accept|clarification|complete|remove`; `remove` требует `basis`; `409` после финала), `POST /reviewer/signals/{id}/decision` (reviewed|clarification|dismissed), `GET/POST …/messages`, `GET …/audit` (только submitted-scope), `GET …/export` (JSON результата с ограничениями).
+- **Детерминированные проверки** `rules.py` — 6 правил над снапшотом версии: `period-order`, `relative-without-kinship`, `kinship-payments-missing`, `housing-kind-required`, `document-basis-required`, `activity-outside-service`; реестр — `GET /api/reference/rules`.
+- **identity**: сид demo-аккаунтов `reservist` и `reviewer` (тот же учебный пароль, `ALLOW_DEMO_LOGIN`); auto-assign профиля на первого проверяющего при публикации.
+- `tests/test_profile.py` — 18 контракт-тестов: ролевые границы (401/403), вехи прогресса, полная замена черновика, публикация + слепки версий, невидимость черновика, жизненный цикл несоответствий и решений, переписка, аудит по scope, дедуп документов, экспорт.
+- **Проверено:** `ruff` чист, `pytest` **55/55**; живой E2E через curl: reservist → черновик 90% → submit v1 → сигнал `kinship-payments-missing` → clarification → вопрос резервисту → правка → resubmit v2 → complete → аудит; docker-стек пересобран, миграция применена, контур работает через nginx `:8080`; `/openapi.json` — 33 пути, теги `profile`/`reviewer`/`reference`, 64 схемы.
+
+**Далее (итерация 9):** подключение `frontend/src/profile` (`/prototype`) к API — сейчас экран полностью в памяти; UI-правки из «Интерфейс» (круглая шкала прогресса, «несоответствия», контакты операторов из `reference_contacts`).
 
 ### Итерация 7 — SPEC v1.2 + documents-домен (17.11.2026)
 

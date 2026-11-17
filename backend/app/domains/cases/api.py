@@ -5,14 +5,16 @@
 """
 
 import uuid
+from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_db
 from app.core.schemas import ErrorOut
 from app.domains.cases import services
 from app.domains.cases.schemas import CaseCreateIn, CaseDetailOut, CaseSummaryOut
+from app.domains.documents.demo import apply_demo_kit
 from app.domains.identity.deps import get_current_user
 from app.domains.identity.models import User
 
@@ -68,4 +70,34 @@ async def get_case(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Дело не найдено"
         )
+    return detail
+
+
+@router.post(
+    "/cases/{case_id}/demo",
+    response_model=CaseDetailOut,
+    summary="Наполнить демо-комплектом",
+    description=(
+        "Учебные «документы» и факты сценария `kind` (`trade_in`/`apartment`); "
+        "`clean=true` — комплект без расхождений. Повторное наполнение "
+        "идемпотентно (дедупликация по sha256 документа)."
+    ),
+    responses={**_NOT_FOUND, 422: {"model": ErrorOut, "description": "Неизвестный kind"}},
+)
+async def load_demo_kit(
+    case_id: uuid.UUID,
+    kind: Literal["trade_in", "apartment"] = Query(default="trade_in"),
+    clean: bool = Query(default=False),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> CaseDetailOut:
+    case = await services.get_owned_case(db, user, case_id)
+    if case is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Дело не найдено"
+        )
+    await apply_demo_kit(db, case, kind=kind, clean=clean, author=user.username)
+    await db.commit()
+    detail = await services.get_case_detail(db, user, case_id)
+    assert detail is not None
     return detail
