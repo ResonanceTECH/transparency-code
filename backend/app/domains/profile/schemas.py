@@ -7,7 +7,7 @@
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -201,6 +201,25 @@ class VersionOut(BaseModel):
 
 class VersionDetailOut(VersionOut):
     snapshot: dict
+
+
+class DiffEntryOut(BaseModel):
+    """Одно изменение между снапшотами: путь + значение до/после.
+
+    `before`/`after` — `null` при добавлении/удалении элемента списка."""
+
+    path: str
+    before: Any = None
+    after: Any = None
+
+
+class VersionDiffOut(BaseModel):
+    """Результат сравнения двух опубликованных версий («что изменилось»)."""
+
+    version_from: int
+    version_to: int
+    changed: int
+    entries: list[DiffEntryOut]
 
 
 # ---------- Проверяющий ----------

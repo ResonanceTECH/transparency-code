@@ -25,6 +25,7 @@ from app.core.schemas import ErrorOut
 from app.domains.identity.deps import get_current_user
 from app.domains.identity.models import User, UserRole
 from app.domains.profile import services as svc
+from app.domains.profile.diff import diff_snapshots
 from app.domains.profile.models import (
     AuditScope,
     ProfileDocument,
@@ -50,6 +51,7 @@ from app.domains.profile.schemas import (
     SignalDecisionOut,
     SignalOut,
     VersionDetailOut,
+    VersionDiffOut,
     VersionOut,
 )
 
@@ -315,6 +317,28 @@ async def get_version(number: int, user: User = Depends(require_reservist),
     return VersionDetailOut(id=version.id, number=version.number,
                             status=version.status, progress=version.progress,
                             created_at=version.created_at, snapshot=version.snapshot)
+
+
+@router.get(
+    "/profile/versions/{number}/diff/{other}",
+    response_model=VersionDiffOut, tags=["profile"],
+    summary="Сравнение двух версий («что изменилось»)",
+    description="Структурный diff снапшотов: изменённые поля, добавленные и "
+                "удалённые элементы списков. Технические ключи (id, метки "
+                "времени) из сравнения исключены.",
+    responses={k: v for k, v in _ERRORS.items() if k in (401, 403, 404)},
+)
+async def diff_versions(number: int, other: int,
+                        user: User = Depends(require_reservist),
+                        db: AsyncSession = Depends(get_db)):
+    profile = await svc.get_or_create_profile(db, user)
+    by_number = {v.number: v for v in profile.versions}
+    base, target = by_number.get(number), by_number.get(other)
+    if base is None or target is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Версия не найдена")
+    entries = diff_snapshots(base.snapshot, target.snapshot)
+    return VersionDiffOut(version_from=number, version_to=other,
+                          changed=len(entries), entries=entries)
 
 
 @router.post(
