@@ -173,3 +173,14 @@ cp .env.example .env
 - Проверено: `ruff` чист, `pytest` **58/58**; `/openapi.json` — 35 путей, все 19 эндпоинтов §10.7 (`profile`/`reviewer`/`reference`), `IncomeSummaryOut` в схемах.
 
 **Контракт этапа 2 (SPEC §10) реализован полностью.** Открытый фронт работ — итерация 10: подключение `frontend/src/profile` к API (сейчас макет в памяти).
+
+### Итерация 10 — frontend `ProfileApp` + фикс сериализации reviewer-карточки (17.11.2026)
+
+**Контекст:** `src/app/profile.tsx` (`ProfileApp`) уже был подключён к API параллельной работой — App.tsx роутит `reservist`/`reviewer` в него после логина; `/prototype` остаётся in-memory макетом (его держат `tests/profile.spec.ts`).
+
+- **Багфикс backend:** `GET /api/reviewer/profiles/{id}` отдавал **500** на профилях с перепиской/решениями — api.py конструировал `ReviewerProfileOut` напрямую из ORM-объектов `ProfileMessage`/`ProfileReview`, а вложенные `MessageOut`/`ReviewOut` не имели `from_attributes` (тесты проходили, т.к. списки были пусты). Fix: `model_config = ConfigDict(from_attributes=True)` в `MessageOut` и `ReviewOut`. Проверено на живом API: 200, messages/reviews/income_summary на месте.
+- **Frontend `src/app/profile.tsx`:**
+  - `ReviewerView` — панель «Сведения о доходах» (SPEC §10.8): итог + разбивка по категориям из `income_summary`; панель «Журнал рассмотрения» (`GET …/audit`, submitted-scope).
+  - `ReservistView` — поле «Форма» (monetary/in_kind) в редакторе записей выплат (без него `income_summary` из UI всегда 0); панель «Журнал действий» (`GET /profile/audit`).
+  - Типы: `IncomeSummary`, `AuditEvent`, `income_summary` в `ReviewerProfile`.
+- Проверено: `tsc --noEmit` чист, `vite build` OK; backend `ruff` чист, `pytest` **58/58**; живой E2E: reviewer login → queue → карточка completed-профиля → 200 + `income_summary`.
