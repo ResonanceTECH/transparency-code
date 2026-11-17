@@ -1,34 +1,14 @@
 """Контракт auth по SPEC.md §4: login/me/logout, cookie-сессии, 401."""
 
-import uuid
 from datetime import UTC, datetime, timedelta
 
-import pytest
 from sqlalchemy import select
 
-from app.domains.identity.models import User, UserSession
-from app.domains.identity.services import hash_password
+from app.domains.identity.models import UserSession
 
-PASSWORD = "demo-pass-2026"
+from conftest import DEMO_PASSWORD
 
-
-@pytest.fixture
-async def demo_user(db_session):
-    user = User(
-        id=uuid.uuid4(),
-        username="demo",
-        password_hash=hash_password(PASSWORD),
-        display_name="Демо",
-        role="specialist",
-    )
-    db_session.add(user)
-    await db_session.commit()
-    return user
-
-
-async def login(client) -> None:
-    resp = await client.post("/api/auth/login", json={"username": "demo", "password": PASSWORD})
-    assert resp.status_code == 200, resp.text
+PASSWORD = DEMO_PASSWORD
 
 
 async def test_health_is_public(client):
@@ -80,7 +60,9 @@ async def test_login_me_logout_flow(client, demo_user):
 
 
 async def test_expired_session_rejected(client, demo_user, db_session):
-    await login(client)
+    await client.post(
+        "/api/auth/login", json={"username": "demo", "password": PASSWORD}
+    )
     # «Протухаем» все сессии напрямую в БД.
     sessions = (await db_session.scalars(select(UserSession))).all()
     for s in sessions:

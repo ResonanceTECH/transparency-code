@@ -20,7 +20,7 @@ router = APIRouter(tags=["cases"])
 
 @router.get("/cases", response_model=list[CaseSummaryOut])
 async def list_cases(
-    user: User = Depends(_current_user),
+    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[CaseSummaryOut]:
     """Реестр дел текущего пользователя, новые первыми."""
@@ -34,7 +34,7 @@ async def list_cases(
 )
 async def create_case(
     payload: CaseCreateIn,
-    user: User = Depends(_current_user),
+    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> CaseSummaryOut:
     """Создать дело проверки; номер `PR-<year>-<seq>` генерирует сервер."""
@@ -46,7 +46,7 @@ async def create_case(
 @router.get("/cases/{case_id}", response_model=CaseDetailOut)
 async def get_case(
     case_id: uuid.UUID,
-    user: User = Depends(_current_user),
+    user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> CaseDetailOut:
     """Карточка дела: факты, документы, запуски анализа, события.

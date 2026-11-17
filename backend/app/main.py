@@ -56,6 +56,14 @@ def create_app() -> FastAPI:
             domain.router, prefix="/api", dependencies=[Depends(get_current_user)]
         )
 
+    @app.middleware("http")
+    async def no_store_api(request: Request, call_next):
+        """`Cache-Control: no-store` на все `/api/*` — приватные данные (SPEC.md §8)."""
+        response = await call_next(request)
+        if request.url.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-store"
+        return response
+
     @app.exception_handler(StarletteHTTPException)
     async def http_error_handler(_request: Request, exc: StarletteHTTPException) -> JSONResponse:
         # Единый формат ошибок клиента: {"detail": "..."} (SPEC.md §3).
