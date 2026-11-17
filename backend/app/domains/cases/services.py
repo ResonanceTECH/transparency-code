@@ -26,12 +26,9 @@ from app.domains.documents.schemas import FactOut
 from app.domains.documents.services import serialize_document, serialize_fact
 from app.domains.identity.models import User
 
+from app.domains.cases.events import record_event  # noqa: F401 — реэкспорт для api/тестов
+
 PENDING_STATUSES = {SignalStatus.UNREVIEWED, SignalStatus.CLARIFICATION, SignalStatus.FURTHER_REVIEW}
-
-
-def record_event(db: AsyncSession, case: Case, message: str, author: str = "") -> None:
-    """Событие в ленту «История действий»; формат сообщения — «Короткое: детали»."""
-    db.add(CaseEvent(case_id=case.id, message=message, author=author))
 
 
 async def next_case_number(db: AsyncSession, year: int) -> str:

@@ -15,8 +15,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.config import Settings
+from app.domains.cases.events import record_event
 from app.domains.cases.models import Case
-from app.domains.cases.services import record_event
 from app.domains.documents.models import Document, DocumentStatus, Fact
 from app.domains.documents.pipeline import (
     ALLOWED_EXTENSIONS,
