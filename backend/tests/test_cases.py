@@ -2,14 +2,11 @@
 
 import uuid
 
-import pytest
 from sqlalchemy import select
 
 from app.domains.cases.models import Case, CaseEvent
 from app.domains.identity.models import User, UserRole
 from app.domains.identity.services import hash_password
-
-from conftest import DEMO_PASSWORD
 
 VALID_PAYLOAD = {
     "synthetic": True,
