@@ -473,27 +473,29 @@ reviewer_assignments (reviewer_id, profile_id, assigned_by, created_at) — на
 | `ЖМ-01` | Жилищные меры: смешаны денежная выплата/субсидия/кредит/предоставление (`housing.kind` противоречит основанию) |
 | `КП-01` | Комплектность: запись категории без обязательного документа (support/housing/приказы) |
 
-### 10.7 Эндпоинты этапа 2 (проект контракта)
+### 10.7 Эндпоинты этапа 2 (реализовано — итерация 8)
 
-Префикс `/api`, те же соглашения §3 (JSON везде, `detail`-ошибки, no-store). Резервист — только свой профиль; проверяющий — только `reviewer_assignments` и submitted-контур.
+Префикс `/api`, те же соглашения §3 (JSON везде, `detail`-ошибки, no-store). Резервист — только свой профиль (`require_reservist`); проверяющий — `reviewer|specialist` (`require_reviewer`), видит только submitted-контур. Промежуточные решения (`accept`, `clarification`, `complete`, `remove`) объединены в один эндпоинт `POST /reviewer/profiles/{id}/decision` с полем `action` — единая точка статус-машины и аудита.
 
 | Метод | Путь | Назначение |
 |---|---|---|
-| GET/PUT | `/api/profile` | черновик владельца (автосоздание при первом GET) |
-| GET | `/api/profile/completeness` | прогресс, вехи, `missing[]`, можно ли submit |
-| POST | `/api/profile/submit` | `422` при неполноте; иначе → `profile_versions N`, статус `submitted` |
-| GET | `/api/profile/versions` | свои версии (резервист); проверяющему — через reviewer-API |
-| POST | `/api/profile/documents` | multipart-вложения профиля (те же лимиты §8; `kind` без банковских выписок) |
-| GET | `/api/profile/messages` | переписка по своему профилю |
-| GET | `/api/reference/contacts` | ответственные сотрудники (публичный справочник) |
-| GET | `/api/reviewer/queue` | назначенные материалы: поиск/фильтр по статусу/программе |
-| GET | `/api/reviewer/profiles/{id}` | submitted-версия + несоответствия + документы (404 если не назначен/не отправлен) |
-| POST | `/api/reviewer/profiles/{id}/accept` | «Принят к рассмотрению» (при полном комплекте; иначе `409` → clarification со списком недостающего) |
-| POST | `/api/reviewer/profiles/{id}/clarifications` | «Требуются уточнения»: вопрос → статус `clarification`, сообщение резервисту |
+| GET/PUT | `/api/profile` | черновик владельца (автосоздание при первом GET; PUT — полная замена, `409` вне draft/clarification) |
+| GET | `/api/profile/completeness` | прогресс, вехи, `missing[]`, `can_submit` |
+| POST | `/api/profile/submit` | `422` при неполноте; иначе → `profile_versions N` + проверки + auto-assign, статус `submitted`/`resubmitted` |
+| GET | `/api/profile/versions`, `…/versions/{n}` | свои версии и слепки (резервист) |
+| GET | `/api/profile/signals` | несоответствия по своим опубликованным версиям |
+| POST/DELETE | `/api/profile/documents`, `…/documents/{id}` | multipart-вложения (`kind`: diploma/reserve_act/order/contract/act/letter/other), дедуп по sha256 |
+| GET/POST | `/api/profile/messages` | переписка; POST — ответ резервиста (`409` до первой публикации) |
+| GET | `/api/profile/audit` | журнал своего профиля (оба scope) |
+| GET | `/api/reference/contacts` | ответственные сотрудники (справочник для обеих ролей) |
+| GET | `/api/reference/rules` | реестр детерминированных проверок профиля |
+| GET | `/api/reviewer/queue` | очередь опубликованных профилей; фильтр `?status=` |
+| GET | `/api/reviewer/profiles/{id}` | последняя версия + несоответствия + переписка + решения (404 для черновика) |
+| POST | `/api/reviewer/profiles/{id}/decision` | `action: accept|clarification|complete|remove`; комментарий ≥5; `remove` требует `basis`; `409` при completed/removed |
 | POST | `/api/reviewer/signals/{id}/decision` | решение по несоответствию (`reviewed|clarification|dismissed` + комментарий ≥5) |
-| POST | `/api/reviewer/profiles/{id}/decision` | итог: `completed|removed` + реквизиты основания + документ |
 | GET/POST | `/api/reviewer/profiles/{id}/messages` | переписка по материалу |
-| GET | `/api/reviewer/profiles/{id}/export` | выгрузка JSON результата |
+| GET | `/api/reviewer/profiles/{id}/audit` | журнал submitted-scope |
+| GET | `/api/reviewer/profiles/{id}/export` | выгрузка JSON результата (версия + сигналы + решения + ограничения) |
 
 Аудит `profile_audit` пишется при: входе, просмотре submitted-версии, загрузке/выгрузке, изменении статуса, решении по несоответствию, сообщении. Резервист видит `private`-scope своего профиля + публичные события submitted; проверяющий — только `submitted`-scope.
 

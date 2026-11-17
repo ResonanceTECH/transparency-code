@@ -367,6 +367,24 @@ async def test_document_upload_dedup_and_validation(reservist_client):
     assert r.status_code == 422
 
 
+async def test_export_result(reservist_client, reviewer_client):
+    await _fill_and_submit(reservist_client)
+    pid = (await reviewer_client.get("/api/reviewer/queue")).json()[0]["profile_id"]
+    await reviewer_client.post(
+        f"/api/reviewer/profiles/{pid}/decision",
+        json={"action": "complete", "comment": "Проверка завершена"})
+    r = await reviewer_client.get(f"/api/reviewer/profiles/{pid}/export")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["profile"]["status"] == "completed"
+    assert body["version"]["number"] == 1
+    assert body["reviews"][0]["result"] == "completed"
+    assert body["limitations"]
+    # экспорт недоступен резервисту
+    assert (await reservist_client.get(
+        f"/api/reviewer/profiles/{pid}/export")).status_code == 403
+
+
 # ---------- справочник ----------
 
 
