@@ -2,7 +2,7 @@
 name = "resonance-backend"
 version = "0.1.0"
 description = "Резонанс — backend API прототипа проверки сведений (FastAPI + PostgreSQL)"
-readme = "Readme.md"
+readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115,<0.120",
@@ -13,6 +13,7 @@ dependencies = [
     "pydantic>=2.7,<3",
     "pydantic-settings>=2.3,<3",
     "python-multipart>=0.0.9,<0.1",
+    "argon2-cffi>=23.1,<26",
 ]
 
 [project.optional-dependencies]
@@ -45,3 +46,17 @@ extend-exclude = ["alembic/versions"]
 select = ["E", "F", "I", "UP", "B", "ASYNC", "RUF"]
 # Докстринги проекта на русском — неоднозначные юникод-символы ожидаемы.
 ignore = ["RUF001", "RUF002", "RUF003"]
+
+[tool.ruff.lint.flake8-bugbear]
+# Depends/Query/… — стандартный паттерн FastAPI, а не баг.
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Body",
+    "fastapi.Header",
+    "fastapi.Cookie",
+    "fastapi.Form",
+    "fastapi.File",
+    "fastapi.Security",
+]

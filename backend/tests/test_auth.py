@@ -1,0 +1,91 @@
+"""Контракт auth по SPEC.md §4: login/me/logout, cookie-сессии, 401."""
+
+import uuid
+from datetime import UTC, datetime, timedelta
+
+import pytest
+from sqlalchemy import select
+
+from app.domains.identity.models import User, UserSession
+from app.domains.identity.services import hash_password
+
+PASSWORD = "demo-pass-2026"
+
+
+@pytest.fixture
+async def demo_user(db_session):
+    user = User(
+        id=uuid.uuid4(),
+        username="demo",
+        password_hash=hash_password(PASSWORD),
+        display_name="Демо",
+        role="specialist",
+    )
+    db_session.add(user)
+    await db_session.commit()
+    return user
+
+
+async def login(client) -> None:
+    resp = await client.post("/api/auth/login", json={"username": "demo", "password": PASSWORD})
+    assert resp.status_code == 200, resp.text
+
+
+async def test_health_is_public(client):
+    resp = await client.get("/api/health")
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "ok"}
+
+
+async def test_me_requires_session(client):
+    resp = await client.get("/api/auth/me")
+    assert resp.status_code == 401
+    assert resp.json() == {"detail": "Требуется вход"}
+
+
+async def test_login_wrong_password(client, demo_user):
+    resp = await client.post(
+        "/api/auth/login", json={"username": "demo", "password": "wrong"}
+    )
+    assert resp.status_code == 401
+    assert resp.json() == {"detail": "Неверный логин или пароль"}
+
+
+async def test_login_unknown_user(client):
+    resp = await client.post(
+        "/api/auth/login", json={"username": "ghost", "password": "whatever-123"}
+    )
+    assert resp.status_code == 401
+
+
+async def test_login_me_logout_flow(client, demo_user):
+    resp = await client.post(
+        "/api/auth/login", json={"username": "demo", "password": PASSWORD}
+    )
+    assert resp.status_code == 200
+    assert resp.json() == {"username": "demo"}
+    cookie = resp.headers["set-cookie"]
+    assert "session=" in cookie and "HttpOnly" in cookie and "samesite=lax" in cookie.lower()
+
+    resp = await client.get("/api/auth/me")
+    assert resp.status_code == 200
+    assert resp.json() == {"username": "demo"}
+
+    resp = await client.post("/api/auth/logout")
+    assert resp.status_code == 200
+    assert resp.json() == {}  # клиент всегда парсит JSON
+
+    resp = await client.get("/api/auth/me")
+    assert resp.status_code == 401
+
+
+async def test_expired_session_rejected(client, demo_user, db_session):
+    await login(client)
+    # «Протухаем» все сессии напрямую в БД.
+    sessions = (await db_session.scalars(select(UserSession))).all()
+    for s in sessions:
+        s.expires_at = datetime.now(UTC) - timedelta(seconds=1)
+    await db_session.commit()
+
+    resp = await client.get("/api/auth/me")
+    assert resp.status_code == 401
