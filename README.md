@@ -1,6 +1,22 @@
 # Резонанс
 
-Прототип цифрового финансового профиля резервиста (хакатон, направление № 6). Только вымышленные данные; решения принимает уполномоченный специалист, система юридически значимых выводов не делает.
+Прототип цифрового финансового профиля резервиста (хакатон, направление № 6). Клиент и API для проверки сведений: дела проверок, документы, извлечённые факты, детерминированный анализ, сигналы, решения специалиста и отчёт. Только вымышленные данные; решения принимает уполномоченный специалист, система юридически значимых выводов не делает.
+
+## Запуск в Docker (весь стек)
+
+```bash
+cp .env.example .env   # заполнить POSTGRES_PASSWORD и SECRET_KEY
+docker compose up -d --build
+```
+
+Поднимаются три сервиса: `db` (PostgreSQL 16), `backend` (FastAPI, миграции применяются при старте) и `frontend` (nginx + собранный SPA). Порт фронта задаётся `HTTP_PORT` (по умолчанию 80).
+
+## Как войти
+
+- Приложение: **http://localhost:8080** (или `http://localhost`, если `HTTP_PORT` не задан)
+- Логин: **`demo`** · пароль: **`resonance-demo-2026`** — демо-аккаунт сидируется при старте (`ALLOW_DEMO_LOGIN=true`, только для учебного контура)
+- Swagger UI: **http://localhost:8080/docs** или **/swagger**
+- Проверка API: `curl http://localhost:8080/api/health` → `{"status":"ok"}`
 
 ## Структура репозитория
 
@@ -15,11 +31,24 @@ transparency-code/
 - **Frontend:** [frontend/README.md](frontend/README.md) — запуск `npm ci && npm run dev:prototype`, тесты Playwright.
 - **Backend:** [backend/README.md](backend/README.md) и [backend/SPEC.md](backend/SPEC.md) — спецификация API и данных.
 
-## Быстрый старт (frontend)
+## Быстрый старт без Docker (frontend-макет)
 
 ```bash
 cd frontend
 npm ci
-npm run dev:prototype   # макет на http://127.0.0.1:4173/prototype
+npm run dev:prototype   # макет на http://127.0.0.1:4173/prototype, без бэкенда
 npm run dev             # интеграционный UI на :5173 (нужен backend на :8000)
 ```
+
+## CI/CD (GitHub Actions)
+
+Все workflows лежат в `.github/workflows/` и срабатывают только по релевантным путям:
+
+| Workflow | Триггер | Что делает |
+|---|---|---|
+| `frontend-ci.yml` | push/PR, `frontend/**` | `npm ci` → typecheck → build → Playwright-тесты макета |
+| `backend-ci.yml` | push/PR, `backend/**` | ruff + pytest; отдельный job: миграции на реальном PostgreSQL (`alembic upgrade head` + `alembic check`) |
+| `e2e.yml` | push в `main` и PR | собирает весь стек docker compose и гоняет `frontend/tests/flow.spec.ts` против `127.0.0.1:8080` |
+| `cd.yml` | push в `main` | собирает и пушит образы `backend`/`frontend` в GHCR (`latest` + `sha-*` + `main`) |
+
+Образы: `ghcr.io/<org>/transparency-code-backend` и `ghcr.io/<org>/transparency-code-frontend` — на любом сервере развёртывание сводится к `docker compose pull` + `up` (или `docker run` с env из `.env.example`).

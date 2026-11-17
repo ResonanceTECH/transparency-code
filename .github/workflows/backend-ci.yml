@@ -1,0 +1,60 @@
+name: backend-ci
+
+on:
+  push:
+    paths: ['backend/**', '.github/workflows/backend-ci.yml']
+  pull_request:
+    paths: ['backend/**', '.github/workflows/backend-ci.yml']
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv python install 3.12
+      - run: uv venv --python 3.12 .venv
+      - run: uv pip install --python .venv/bin/python -e ".[dev]"
+      - run: .venv/bin/python -m ruff check app tests alembic
+      - run: .venv/bin/python -m pytest -q
+
+  migrations:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: resonance
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: resonance
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U resonance -d resonance"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql+asyncpg://resonance:ci@localhost:5432/resonance
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv python install 3.12
+      - run: uv venv --python 3.12 .venv
+      - run: uv pip install --python .venv/bin/python -e .
+      - run: .venv/bin/python -m alembic upgrade head
+      - run: .venv/bin/python -m alembic check

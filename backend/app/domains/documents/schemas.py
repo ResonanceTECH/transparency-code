@@ -1,15 +1,13 @@
-"""Pydantic-схемы documents-домена: DTO документов и извлечённых фактов (SPEC.md §4–5)."""
+"""Pydantic-схемы documents-домена: документы, факты, патч (SPEC.md §5.4–5.5)."""
 
-import uuid
-from datetime import date, datetime
+from datetime import date as date_type
+from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class DocumentOut(BaseModel):
-    """Метаданные документа в API; `name` ← `documents.filename`."""
-
-    id: uuid.UUID
+    id: UUID
     name: str
     sha256: str
     status: str
@@ -18,16 +16,23 @@ class DocumentOut(BaseModel):
 
 
 class FactOut(BaseModel):
-    """Извлечённое поле документа — единый формат для `facts[]` и `evidence[]`."""
-
-    id: uuid.UUID
-    document_id: uuid.UUID | None
+    id: UUID
+    document_id: UUID
     document_name: str
     field: str
     label: str
     value: str
     object_id: str
-    date: date | None
+    date: date_type | None
     unit: str
     snippet: str
     confirmed: bool
+
+
+class FactPatchIn(BaseModel):
+    """Тело `PATCH /facts/{id}` — все поля опциональны, меняются только переданные."""
+
+    value: str | None = Field(default=None, min_length=1, max_length=300)
+    date: date_type | None = None
+    unit: str | None = Field(default=None, min_length=1, max_length=30)
+    confirmed: bool | None = None

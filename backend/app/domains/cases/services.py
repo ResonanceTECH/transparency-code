@@ -10,10 +10,11 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.domains.analysis.models import AnalysisRun, Decision, Signal, SignalFact, SignalStatus
+from app.domains.analysis.models import AnalysisRun, Signal, SignalFact, SignalStatus
 from app.domains.analysis.schemas import DecisionOut, RunOut, SignalOut
 from app.domains.analysis.services import compute_input_hash
-from app.domains.cases.models import Case, CaseEvent
+from app.domains.cases.events import record_event
+from app.domains.cases.models import Case
 from app.domains.cases.schemas import (
     CaseCreateIn,
     CaseDetailOut,
@@ -22,15 +23,11 @@ from app.domains.cases.schemas import (
     EventOut,
 )
 from app.domains.documents.models import Fact
+from app.domains.documents.schemas import FactOut
 from app.domains.documents.services import serialize_document, serialize_fact
 from app.domains.identity.models import User
 
 PENDING_STATUSES = {SignalStatus.UNREVIEWED, SignalStatus.CLARIFICATION, SignalStatus.FURTHER_REVIEW}
-
-
-def record_event(db: AsyncSession, case: Case, message: str, author: str = "") -> None:
-    """Событие в ленту «История действий»; формат сообщения — «Короткое: детали»."""
-    db.add(CaseEvent(case_id=case.id, message=message, author=author))
 
 
 async def next_case_number(db: AsyncSession, year: int) -> str:
@@ -79,7 +76,7 @@ def _summarize(case: Case, run: AnalysisRun | None, signals: list[Signal], stale
     )
 
 
-def _serialize_signal(signal: Signal) -> SignalOut:
+def serialize_signal(signal: Signal) -> SignalOut:
     evidence: list[FactOut] = []
     for link in signal.evidence_links:
         if link.fact_snapshot:
@@ -108,7 +105,7 @@ def _serialize_signal(signal: Signal) -> SignalOut:
     )
 
 
-def _serialize_run(run: AnalysisRun) -> RunOut:
+def serialize_run(run: AnalysisRun) -> RunOut:
     return RunOut(
         id=run.id,
         created_at=_utc(run.created_at),
@@ -116,7 +113,7 @@ def _serialize_run(run: AnalysisRun) -> RunOut:
         enabled_rules=list(run.enabled_rules or []),
         input_hash=run.input_hash,
         warnings=list(run.warnings or []),
-        signals=[_serialize_signal(s) for s in run.signals],
+        signals=[serialize_signal(s) for s in run.signals],
     )
 
 
@@ -211,6 +208,13 @@ _CASE_DETAIL_OPTIONS = (
 )
 
 
+async def get_owned_case(db: AsyncSession, user: User, case_id: uuid.UUID) -> Case | None:
+    """Дело пользователя или None — seam для других доменов (MICROSERVICES.md §5)."""
+    return await db.scalar(
+        select(Case).where(Case.id == case_id, Case.owner_id == user.id)
+    )
+
+
 async def get_case_detail(db: AsyncSession, user: User, case_id: uuid.UUID) -> CaseDetailOut | None:
     """Полная карточка дела; `None` — нет дела или чужое (→ 404, SPEC.md §5.3)."""
     case = await db.scalar(
@@ -228,7 +232,7 @@ async def get_case_detail(db: AsyncSession, user: User, case_id: uuid.UUID) -> C
         **_summarize(case, run, signals, stale).model_dump(),
         facts=[serialize_fact(f) for f in facts],
         documents=[serialize_document(d) for d in documents],
-        runs=[_serialize_run(r) for r in case.runs],
+        runs=[serialize_run(r) for r in case.runs],
         events=[
             EventOut(
                 id=e.id,

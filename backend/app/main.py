@@ -39,7 +39,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="Резонанс API",
+        title="Резонанс · синтетический прототип",
         version="0.1.0",
         description="API прототипа проверки сведений. Только синтетические данные.",
         lifespan=lifespan,
