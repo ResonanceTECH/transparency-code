@@ -1,10 +1,13 @@
+import { useEffect, useRef } from 'react'
 import {
   Bell,
   BookOpen,
   ChevronDown,
   ChevronRight,
+  Download,
   Info,
   LockKeyhole,
+  LogOut,
   Menu,
   ShieldCheck,
   UserRound,
@@ -36,8 +39,20 @@ import { person, responsibleContacts, headings, documents } from './data'
 import { Panel, PanelTitle, Notice } from './ui'
 import './financial-profile.css'
 
-export default function FinancialProfile() {
-  const m = useProfileModel()
+export type PrototypeUser = { username: string; display_name: string; role: string }
+
+export default function FinancialProfile({
+  role: initialRole,
+  user,
+  onLogout,
+  onQuickLogin
+}: {
+  role: 'reservist' | 'reviewer'
+  user: PrototypeUser
+  onLogout: () => void
+  onQuickLogin: () => void
+}) {
+  const m = useProfileModel(initialRole)
   const {
     role,
     screen,
@@ -51,14 +66,65 @@ export default function FinancialProfile() {
     sent,
     version,
     navigate,
-    switchRole,
     nav,
     activeNav,
     protectedReviewerScreen
   } = m
+
+  const fallbackName = role === 'reservist' ? 'Алексей Ковалёв' : 'Анна Иванова'
+  const displayName = user.display_name || fallbackName
+  const initials = displayName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0])
+    .join('')
+    .toUpperCase()
+  const roleLabel = role === 'reservist' ? 'Резервист' : 'Проверяющий'
+  const modalRef = useRef<HTMLElement | null>(null)
+  const lastFocused = useRef<HTMLElement | null>(null)
+
+  useEffect(() => {
+    if (!preview) return
+    lastFocused.current = document.activeElement as HTMLElement | null
+    const focusable = () =>
+      Array.from(
+        modalRef.current?.querySelectorAll<HTMLElement>(
+          'button, a[href], iframe, [tabindex]:not([tabindex="-1"])'
+        ) || []
+      )
+    focusable()[0]?.focus()
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setPreview(null)
+        return
+      }
+      if (event.key !== 'Tab') return
+      const items = focusable()
+      if (!items.length) return
+      const first = items[0]
+      const last = items[items.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      lastFocused.current?.focus()
+    }
+  }, [preview, setPreview])
+
   return (
     <div className="fp-shell">
-      <aside className={`fp-sidebar ${mobileNav ? 'open' : ''}`}>
+      <a className="fp-skip-link" href="#fp-main">
+        Перейти к содержимому
+      </a>
+      <aside id="fp-sidebar" className={`fp-sidebar ${mobileNav ? 'open' : ''}`}>
         <button className="fp-mobile-close" aria-label="Закрыть меню" onClick={() => setMobileNav(false)}>
           <X size={20} />
         </button>
@@ -82,7 +148,12 @@ export default function FinancialProfile() {
               aria-label={item.title}
               className={activeNav === item.screen ? 'active' : ''}
               onClick={() => navigate(item.screen)}
-              disabled={role === 'reviewer' && !sent && item.screen !== 'queue'}
+              disabled={role === 'reviewer' && !sent && item.screen !== 'queue' && item.screen !== 'instructions'}
+              title={
+                role === 'reviewer' && !sent && item.screen !== 'queue' && item.screen !== 'instructions'
+                  ? 'Доступно после отправки версии резервистом'
+                  : item.title
+              }
             >
               {item.icon}
               <span>{item.title}</span>
@@ -124,19 +195,16 @@ export default function FinancialProfile() {
           <button
             className="fp-mobile-menu fp-icon-button"
             aria-label="Открыть меню"
+            aria-expanded={mobileNav}
+            aria-controls="fp-sidebar"
             onClick={() => setMobileNav(true)}
           >
             <Menu size={21} />
           </button>
-          <div className="fp-role-switch" aria-label="Демонстрационная смена роли">
-            <button className={role === 'reservist' ? 'active' : ''} onClick={() => switchRole('reservist')}>
-              <UserRound size={16} />
-              Резервист
-            </button>
-            <button className={role === 'reviewer' ? 'active' : ''} onClick={() => switchRole('reviewer')}>
-              <ShieldCheck size={16} />
-              Проверяющий
-            </button>
+          <div className="fp-api-role" aria-label="Роль получена через API" data-profile={role} data-user={user.username}>
+            {role === 'reservist' ? <UserRound size={16} /> : <ShieldCheck size={16} />}
+            <span>{roleLabel}</span>
+            <small>{user.username}</small>
           </div>
           <div className="fp-topbar-right">
             <span className="fp-demo-tag">
@@ -152,16 +220,19 @@ export default function FinancialProfile() {
               {question && <i />}
             </button>
             <div className="fp-topbar-person">
-              <span className="fp-avatar">{role === 'reservist' ? 'АК' : 'АИ'}</span>
+              <span className="fp-avatar">{initials}</span>
               <div>
-                <strong>{role === 'reservist' ? 'Алексей Ковалёв' : 'Анна Иванова'}</strong>
-                <small>{role === 'reservist' ? 'Резервист · демо' : 'Кадровый специалист · демо'}</small>
+                <strong>{displayName}</strong>
+                <small>{roleLabel} · учебный аккаунт</small>
               </div>
               <ChevronDown size={14} />
             </div>
+            <button className="fp-icon-button" aria-label="Выйти" onClick={onLogout} title="Выйти">
+              <LogOut size={17} />
+            </button>
           </div>
         </header>
-        <main className="fp-main">
+        <main className="fp-main" id="fp-main">
           <div className={`fp-page-header ${screen === 'home' ? 'fp-page-header-home' : ''}`}>
             <div>
               <div className="fp-breadcrumb">
@@ -201,7 +272,7 @@ export default function FinancialProfile() {
               {screen === 'activities' && ActivitiesScreen(m)}
               {screen === 'documents' && DocumentsScreen(m)}
               {screen === 'selfcheck' && SelfCheckScreen(m)}
-              {screen === 'queue' && QueueScreen(m)}
+              {screen === 'queue' && QueueScreen(m, onQuickLogin)}
               {screen === 'case' && CaseScreen(m)}
               {screen === 'signals' && SignalsScreen(m)}
               {screen === 'messages' && MessagesScreen(m)}
@@ -222,7 +293,7 @@ export default function FinancialProfile() {
         </main>
       </div>
       {toast && (
-        <div className="fp-toast" role="status">
+        <div className="fp-toast" role="status" aria-live="polite" aria-atomic="true">
           <Info size={18} />
           {toast}
           <button className="fp-icon-button" aria-label="Закрыть уведомление" onClick={() => setToast('')}>
@@ -233,35 +304,38 @@ export default function FinancialProfile() {
       {preview && (
         <div className="fp-modal-backdrop" onClick={() => setPreview(null)}>
           <section
-            className="fp-modal"
+            className="fp-modal fp-modal-file"
             role="dialog"
             aria-modal="true"
-            aria-label="Учебный документ"
+            aria-labelledby="fp-preview-title"
+            ref={modalRef}
             onClick={(e) => e.stopPropagation()}
           >
-            <PanelTitle
-              title="Учебный документ"
-              action={
-                <button
-                  className="fp-icon-button"
-                  aria-label="Закрыть документ"
-                  onClick={() => setPreview(null)}
-                >
-                  <X size={20} />
-                </button>
-              }
-            />
-            <Notice tone="neutral">
-              Это демонстрационный фрагмент, не реальный документ ведомства и не результат OCR.
-            </Notice>
-            <h3>{preview}</h3>
-            <p>
-              Все реквизиты, лица и суммы в макете вымышлены. Документы служат иллюстрацией схемы «получатель
-              → вид → основание → период → документ».
-            </p>
-            <button className="fp-button" onClick={() => setPreview(null)}>
-              Закрыть
-            </button>
+            <div className="fp-modal-head">
+              <h2 id="fp-preview-title">{preview.name}</h2>
+              <button
+                className="fp-icon-button"
+                aria-label="Закрыть документ"
+                onClick={() => setPreview(null)}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            {preview.name.toLowerCase().endsWith('.pdf') ? (
+              <iframe className="fp-file-frame" src={preview.url} title={`Документ ${preview.name}`} />
+            ) : (
+              <Notice tone="neutral">
+                Для этого формата встроенный просмотр недоступен. Скачайте файл, чтобы открыть его локально.
+              </Notice>
+            )}
+            <div className="fp-modal-actions">
+              <a className="fp-button" href={preview.url} download={preview.name}>
+                <Download size={16} /> Скачать
+              </a>
+              <button className="fp-button fp-button-outline" onClick={() => setPreview(null)}>
+                Закрыть
+              </button>
+            </div>
           </section>
         </div>
       )}

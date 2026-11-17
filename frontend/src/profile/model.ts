@@ -6,8 +6,12 @@ import type {
   CandidateDetails,
   PresentedSnapshot,
   SignalDecision,
-  AuditEvent
+  AuditEvent,
+  Entity,
+  Attachment,
+  Preview
 } from './types'
+import { documentUrl, registerFile } from './documents'
 import {
   initialCandidate,
   checkCompleteness,
@@ -19,8 +23,8 @@ import {
   profileId
 } from './data'
 
-export function useProfileModel() {
-  const [role, setRole] = useState<Role>('reservist')
+export function useProfileModel(initialRole: Role = 'reservist') {
+  const [role, setRole] = useState<Role>(initialRole)
   const [screen, setScreen] = useState<Screen>('home')
   const [phase, setPhase] = useState<Phase>('draft')
   const [candidate, setCandidate] = useState<CandidateDetails>({ ...initialCandidate })
@@ -37,7 +41,12 @@ export function useProfileModel() {
   const [consent, setConsent] = useState(false)
   const [corrected, setCorrected] = useState(false)
   const [mobileNav, setMobileNav] = useState(false)
-  const [preview, setPreview] = useState<string | null>(null)
+  const [preview, setPreview] = useState<Preview | null>(null)
+  const [servicePeriods, setServicePeriods] = useState<Entity[]>([])
+  const [familyRecipients, setFamilyRecipients] = useState<Entity[]>([])
+  const [activities, setActivities] = useState<Entity[]>([])
+  const [records, setRecords] = useState<Record<number, Entity[]>>({})
+  const [attachments, setAttachments] = useState<Attachment[]>([])
   const [selectedSignal, setSelectedSignal] = useState(0)
   const [reviewComment, setReviewComment] = useState('')
   const [question, setQuestion] = useState('')
@@ -66,6 +75,16 @@ export function useProfileModel() {
       scope: 'private'
     }
   ])
+
+  // Роль приходит из API. Компонент остаётся смонтированным при смене
+  // пользователя, поэтому синхронизируем роль и стартовый экран.
+  useEffect(() => {
+    setRole(initialRole)
+    setScreen(initialRole === 'reservist' ? 'home' : 'queue')
+    setMobileNav(false)
+    setToast('')
+  }, [initialRole])
+
   const completeness = checkCompleteness(supportFile, housingYear, housingAnswer)
   const ready = completeness.missing === 0
   const sent = presented !== null
@@ -76,7 +95,9 @@ export function useProfileModel() {
   const privateReply = reply
   const progress = ready ? 90 : 70
   const documentCount =
-    role === 'reviewer' && presented ? presented.documentCount : documents.length + (supportFile ? 1 : 0)
+    role === 'reviewer' && presented
+      ? presented.documentCount
+      : documents.length + (supportFile ? 1 : 0) + attachments.length
   const profileStatus =
     phase === 'completed'
       ? 'Рассмотрение завершено'
@@ -114,21 +135,87 @@ export function useProfileModel() {
     window.scrollTo({ top: 0, behavior: 'instant' })
     log(`Просмотр: ${headings[next][0]}`)
   }
-  const switchRole = (next: Role) => {
-    setRole(next)
-    setScreen(next === 'reservist' ? 'home' : 'queue')
-    setMobileNav(false)
-    setToast('')
-    window.scrollTo(0, 0)
-  }
   const showDocument = (name: string) => {
-    setPreview(name)
+    setPreview({ name, url: documentUrl(name) })
     log(`Просмотр документа: ${name}`)
   }
-  const attachSupport = (name: string) => {
+  const attachSupport = (name: string, file?: File) => {
+    if (file) registerFile(file)
     setSupportFile(name)
     log('Добавлен документ региональной поддержки', 'private')
     setToast('Учебный документ добавлен в макет')
+  }
+  const addAttachment = (name: string, file?: File) => {
+    const url = file ? registerFile(file) : documentUrl(name)
+    setAttachments((previous) => [...previous, { id: nextId('file'), name, url }])
+    log(`Добавлен документ: ${name}`, 'private')
+    setToast(`Документ «${name}» добавлен`)
+  }
+  const nextId = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 9)}`
+  const addItem = (
+    list: Entity[],
+    setList: (items: Entity[]) => void,
+    prefix: string,
+    initial: Record<string, string>
+  ) => setList([...list, { id: nextId(prefix), ...initial }])
+  const updateItem = (
+    list: Entity[],
+    setList: (items: Entity[]) => void,
+    id: string,
+    field: string,
+    value: string
+  ) => setList(list.map((item) => (item.id === id ? { ...item, [field]: value } : item)))
+  const removeItem = (list: Entity[], setList: (items: Entity[]) => void, id: string) =>
+    setList(list.filter((item) => item.id !== id))
+
+  const addServicePeriod = () =>
+    addItem(servicePeriods, setServicePeriods, 'period', { kind: 'военная', start: '', end: '' })
+  const updateServicePeriod = (id: string, field: string, value: string) =>
+    updateItem(servicePeriods, setServicePeriods, id, field, value)
+  const removeServicePeriod = (id: string) => {
+    removeItem(servicePeriods, setServicePeriods, id)
+    log('Период службы удалён', 'private')
+  }
+  const addRecipient = () =>
+    addItem(familyRecipients, setFamilyRecipients, 'recipient', { fullName: '', relation: '', year: '' })
+  const updateRecipient = (id: string, field: string, value: string) =>
+    updateItem(familyRecipients, setFamilyRecipients, id, field, value)
+  const removeRecipient = (id: string) => {
+    removeItem(familyRecipients, setFamilyRecipients, id)
+    log('Получатель удалён', 'private')
+  }
+  const addActivity = () =>
+    addItem(activities, setActivities, 'activity', { organization: '', kind: '', period: '' })
+  const updateActivity = (id: string, field: string, value: string) =>
+    updateItem(activities, setActivities, id, field, value)
+  const removeActivity = (id: string) => {
+    removeItem(activities, setActivities, id)
+    log('Деятельность удалена', 'private')
+  }
+  const addRecord = (category: number) =>
+    setRecords((previous) => ({
+      ...previous,
+      [category]: [...(previous[category] || []), { id: nextId('record'), title: '', amount: '', basis: '' }]
+    }))
+  const updateRecord = (category: number, id: string, field: string, value: string) =>
+    setRecords((previous) => ({
+      ...previous,
+      [category]: (previous[category] || []).map((item) =>
+        item.id === id ? { ...item, [field]: value } : item
+      )
+    }))
+  const removeRecord = (category: number, id: string) => {
+    setRecords((previous) => ({
+      ...previous,
+      [category]: (previous[category] || []).filter((item) => item.id !== id)
+    }))
+    log('Запись выплаты удалена', 'private')
+  }
+  const removeAttachment = (id: string) => {
+    const item = attachments.find((file) => file.id === id)
+    URL.revokeObjectURL(item?.url || '')
+    setAttachments((previous) => previous.filter((file) => file.id !== id))
+    log(`Документ удалён: ${item?.name || id}`, 'private')
   }
   const updateCandidate = (field: keyof CandidateDetails, value: string) => {
     setCandidate((previous) => ({ ...previous, [field]: value }))
@@ -229,7 +316,6 @@ export function useProfileModel() {
 
   return {
     role,
-    setRole,
     screen,
     setScreen,
     phase,
@@ -264,6 +350,11 @@ export function useProfileModel() {
     setMobileNav,
     preview,
     setPreview,
+    servicePeriods,
+    familyRecipients,
+    activities,
+    records,
+    attachments,
     selectedSignal,
     setSelectedSignal,
     reviewComment,
@@ -307,9 +398,22 @@ export function useProfileModel() {
     profileStatus,
     log,
     navigate,
-    switchRole,
     showDocument,
     attachSupport,
+    addAttachment,
+    removeAttachment,
+    addServicePeriod,
+    updateServicePeriod,
+    removeServicePeriod,
+    addRecipient,
+    updateRecipient,
+    removeRecipient,
+    addActivity,
+    updateActivity,
+    removeActivity,
+    addRecord,
+    updateRecord,
+    removeRecord,
     updateCandidate,
     repeatSelfCheck,
     recordSignalDecision,
