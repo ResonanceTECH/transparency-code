@@ -183,4 +183,4 @@ cp .env.example .env
   - `ReviewerView` — панель «Сведения о доходах» (SPEC §10.8): итог + разбивка по категориям из `income_summary`; панель «Журнал рассмотрения» (`GET …/audit`, submitted-scope).
   - `ReservistView` — поле «Форма» (monetary/in_kind) в редакторе записей выплат (без него `income_summary` из UI всегда 0); панель «Журнал действий» (`GET /profile/audit`).
   - Типы: `IncomeSummary`, `AuditEvent`, `income_summary` в `ReviewerProfile`.
-- Проверено: `tsc --noEmit` чист, `vite build` OK; backend `ruff` чист, `pytest` **58/58**; живой E2E: reviewer login → queue → карточка completed-профиля → 200 + `income_summary`.
+- Проверено: `tsc --noEmit` чист, `vite build` OK; backend `ruff` чист, `pytest` **58/58**; живой E2E: reviewer login → queue → карточка completed-профиля → 200 + `income_summary`. Браузерный e2e (Playwright + vite :5173 → backend :8000): reservist — workspace/полнота/версии/контакты/аудит/документы; reviewer — очередь → карточка → «Сведения о доходах»/слепок/решения/аудит/export — 15/15 проверок.
