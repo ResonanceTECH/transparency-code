@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.domains.analysis.models import AnalysisRun, Decision, Signal, SignalFact, SignalStatus
+from app.domains.analysis.models import AnalysisRun, Signal, SignalFact, SignalStatus
 from app.domains.analysis.schemas import DecisionOut, RunOut, SignalOut
 from app.domains.analysis.services import compute_input_hash
 from app.domains.cases.models import Case, CaseEvent
@@ -22,6 +22,7 @@ from app.domains.cases.schemas import (
     EventOut,
 )
 from app.domains.documents.models import Fact
+from app.domains.documents.schemas import FactOut
 from app.domains.documents.services import serialize_document, serialize_fact
 from app.domains.identity.models import User
 

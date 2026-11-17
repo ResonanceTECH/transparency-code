@@ -117,7 +117,7 @@ async def test_owner_isolation(auth_client, client, db_session):
 
 async def test_case_events_recorded(auth_client, db_session):
     """Событие создания лежит в case_events с автором (SPEC.md §7.7)."""
-    created = (await auth_client.post("/api/cases", json=VALID_PAYLOAD)).json()
+    await auth_client.post("/api/cases", json=VALID_PAYLOAD)
     case = await db_session.scalar(select(Case).where(Case.number == "PR-2025-0001"))
     events = (
         await db_session.scalars(
