@@ -36,6 +36,8 @@ import {
 } from './views'
 import type { View } from './types'
 import { labels } from './format'
+import { ProfileApp } from './profile'
+import type { Me } from './profile'
 import { Panel, Notice } from './ui'
 import './styles.css'
 
@@ -157,11 +159,11 @@ export default function App() {
             onSubmit={(e) => {
               e.preventDefault()
               task(async () => {
-                const result = await api<{ username: string }>('/auth/login', {
+                const result = await api<Me>('/auth/login', {
                   method: 'POST',
                   body: JSON.stringify({ username: loginName, password: loginPassword })
                 })
-                setUser(result.username)
+                setUser(result)
               })
             }}
           >
@@ -206,6 +208,21 @@ export default function App() {
         </div>
       </main>
     )
+
+  // Роли этапа 2 получают свой контур — рабочее пространство профилей.
+  if (user.role === 'reservist' || user.role === 'reviewer') {
+    return (
+      <ProfileApp
+        me={user}
+        onLogout={() =>
+          task(async () => {
+            await api('/auth/logout', { method: 'POST' })
+            setUser(null)
+          })
+        }
+      />
+    )
+  }
 
   const requiresCase = ['case', 'documents', 'analysis', 'evidence', 'report'].includes(view)
   return (
@@ -264,7 +281,7 @@ export default function App() {
             <span className="synthetic-tag">Синтетические данные</span>
             <div className="avatar">ДМ</div>
             <div className="user">
-              <b>{user}</b>
+              <b>{user.display_name || user.username}</b>
               <small>Специалист · учебный аккаунт</small>
             </div>
             <button
