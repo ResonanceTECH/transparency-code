@@ -453,15 +453,22 @@ async def _get_visible(db: AsyncSession, profile_id: uuid.UUID):
 @router.get(
     "/reviewer/profiles/{profile_id}", response_model=ReviewerProfileOut,
     tags=["reviewer"], summary="Карточка профиля для проверяющего",
-    description="Последняя опубликованная версия (слепок), несоответствия, "
-                "переписка и решения. Черновики сюда не попадают — 404.",
+    description="Опубликованная версия-слепок (последняя или заданная "
+                "параметром `version`), несоответствия, переписка и решения. "
+                "Черновики сюда не попадают — 404.",
     responses={k: v for k, v in _ERRORS.items() if k in (401, 403, 404)},
 )
 async def reviewer_profile(profile_id: uuid.UUID,
+                           version: int | None = Query(None),
                            user: User = Depends(require_reviewer),
                            db: AsyncSession = Depends(get_db)):
     profile = await _get_visible(db, profile_id)
-    version = profile.versions[-1]
+    if version is None:
+        version = profile.versions[-1]
+    else:
+        version = next((v for v in profile.versions if v.number == version), None)
+        if version is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Версия не найдена")
     signals = await svc.profile_signals(db, profile.id, version.id)
     messages = await svc.profile_messages(db, profile.id)
     reviews = await svc.profile_reviews(db, profile.id)
