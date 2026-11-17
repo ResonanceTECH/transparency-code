@@ -92,7 +92,7 @@ class SignalFact(Base):
         ForeignKey("facts.id", ondelete="CASCADE"), primary_key=True, index=True
     )
     ordinal: Mapped[int] = mapped_column(Integer, default=0)
-    # fact_snapshot временно убран для регенерации initial-миграции
+    fact_snapshot: Mapped[dict] = mapped_column(JSONType, default=dict)
 
     signal: Mapped[Signal] = relationship(back_populates="evidence_links")
     fact: Mapped["Fact"] = relationship()
