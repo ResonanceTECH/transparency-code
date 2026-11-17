@@ -1,3 +1,4 @@
+import enum
 import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -5,11 +6,16 @@ from typing import TYPE_CHECKING
 from sqlalchemy import DateTime, Enum, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base
-from app.models.enums import UserRole
+from app.core.base import Base
 
 if TYPE_CHECKING:
-    from app.models.case import Case
+    from app.domains.cases.models import Case
+
+
+class UserRole(str, enum.Enum):
+    SPECIALIST = "specialist"
+    RESERVIST = "reservist"
+    REVIEWER = "reviewer"
 
 
 class User(Base):
