@@ -42,13 +42,13 @@ async def test_login_me_logout_flow(client, demo_user):
         "/api/auth/login", json={"username": "demo", "password": PASSWORD}
     )
     assert resp.status_code == 200
-    assert resp.json() == {"username": "demo"}
+    assert resp.json() == {"username": "demo", "display_name": "Демо", "role": "specialist"}
     cookie = resp.headers["set-cookie"]
     assert "session=" in cookie and "HttpOnly" in cookie and "samesite=lax" in cookie.lower()
 
     resp = await client.get("/api/auth/me")
     assert resp.status_code == 200
-    assert resp.json() == {"username": "demo"}
+    assert resp.json() == {"username": "demo", "display_name": "Демо", "role": "specialist"}
 
     resp = await client.post("/api/auth/logout")
     assert resp.status_code == 200
@@ -56,6 +56,21 @@ async def test_login_me_logout_flow(client, demo_user):
 
     resp = await client.get("/api/auth/me")
     assert resp.status_code == 401
+
+
+async def test_session_soft_check(client, demo_user):
+    # Аноним: всегда 200 — boot-запрос клиента без 401 в консоли.
+    resp = await client.get("/api/auth/session")
+    assert resp.status_code == 200
+    assert resp.json() == {"authenticated": False, "user": None}
+
+    await client.post("/api/auth/login", json={"username": "demo", "password": PASSWORD})
+    resp = await client.get("/api/auth/session")
+    assert resp.status_code == 200
+    assert resp.json() == {
+        "authenticated": True,
+        "user": {"username": "demo", "display_name": "Демо", "role": "specialist"},
+    }
 
 
 async def test_expired_session_rejected(client, demo_user, db_session):

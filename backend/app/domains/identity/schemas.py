@@ -16,3 +16,10 @@ class UserOut(BaseModel):
     role: str = ""  # specialist | reservist | reviewer — клиент строит контур по роли
 
     model_config = {"from_attributes": True}
+
+
+class SessionOut(BaseModel):
+    """Мягкая проверка сессии для boot-запроса клиента: всегда 200."""
+
+    authenticated: bool
+    user: UserOut | None = None
