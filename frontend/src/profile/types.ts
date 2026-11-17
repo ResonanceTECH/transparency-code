@@ -50,7 +50,3 @@ export type SignalDecision = {
   comment: string
 }
 export type NavItem = { screen: Screen; title: string; icon: ReactNode }
-
-export type Entity = { id: string; [key: string]: string }
-export type Attachment = { id: string; name: string; url: string }
-export type Preview = { name: string; url: string }

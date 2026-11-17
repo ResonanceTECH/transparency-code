@@ -490,53 +490,6 @@ main {
 .notice.warning svg {
   color: #c08a2d;
 }
-.notice.clarification-reason {
-  border-left: 4px solid #d08a24;
-  background: #fff6e6;
-}
-.notice.clarification-reason p {
-  margin: 6px 0 0;
-  white-space: pre-line;
-}
-
-/* Печатная форма «Сведения о доходах» для карточки проверяющего. */
-.print-report {
-  display: none;
-}
-@media print {
-  .sidebar, .topbar, .page-heading, .toast, .page-footnote, .notice, .panel {
-    display: none !important;
-  }
-  .workspace {
-    margin: 0 !important;
-    width: 100% !important;
-  }
-  main {
-    padding: 0 !important;
-  }
-  .print-report {
-    display: block !important;
-    font: 12px/1.6 "Segoe UI", Arial, sans-serif;
-  }
-  .print-report h1 {
-    font-size: 20px;
-    margin: 0 0 16px;
-  }
-  .print-report p {
-    margin: 6px 0;
-  }
-  .print-report table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 14px;
-  }
-  .print-report th,
-  .print-report td {
-    border: 1px solid #94a3b8;
-    padding: 8px 10px;
-    text-align: left;
-  }
-}
 .panel-body > .notice:last-child {
   margin-bottom: 0;
 }

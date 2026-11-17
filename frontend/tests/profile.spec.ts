@@ -4,42 +4,6 @@ const demoDocument = (name: string) => ({ name, mimeType: 'application/pdf', buf
 const nav = (page: Page, name: string) => page.getByRole('navigation').getByRole('button', { name, exact: true }).click()
 const category = (page: Page, text: string) => page.locator('.fp-category-row').filter({ hasText: text }).click()
 
-const demoUsers: Record<string, { username: string; display_name: string; role: string }> = {
-  reservist: { username: 'reservist', display_name: 'Алексей Ковалёв', role: 'reservist' },
-  reviewer: { username: 'reviewer', display_name: 'Анна Иванова', role: 'reviewer' },
-  demo: { username: 'demo', display_name: 'Демо-специалист', role: 'specialist' }
-}
-
-async function mockAuth(page: Page) {
-  await page.route('**/api/auth/session', (route) => route.fulfill({ json: { authenticated: false, user: null } }))
-  await page.route('**/api/auth/logout', (route) => route.fulfill({ json: {} }))
-  await page.route('**/api/auth/login', (route) => {
-    const body = route.request().postDataJSON() as { username: string; password: string }
-    const user = demoUsers[body.username]
-    if (user && body.password === 'resonance-demo-2026') return route.fulfill({ json: user })
-    return route.fulfill({ status: 401, json: { detail: 'Неверный логин или пароль' } })
-  })
-}
-
-async function loginAs(page: Page, name: 'reservist' | 'reviewer' | 'demo') {
-  await page.getByLabel('Логин').fill(name)
-  await page.getByLabel('Пароль').fill('resonance-demo-2026')
-  await page.getByRole('button', { name: 'Войти', exact: true }).click()
-  await expect(page.locator('.fp-shell')).toBeVisible()
-}
-
-async function openPrototype(page: Page, name: 'reservist' | 'reviewer' | 'demo' = 'reservist') {
-  await mockAuth(page)
-  await page.goto('/prototype')
-  await loginAs(page, name)
-}
-
-async function switchUser(page: Page, name: 'reservist' | 'reviewer' | 'demo') {
-  await page.getByRole('button', { name: 'Выйти', exact: true }).click()
-  await loginAs(page, name)
-}
-
-
 async function finishRequiredFields(page: Page) {
   await nav(page, 'Выплаты и меры')
   await category(page, 'Федеральная, региональная и муниципальная поддержка')
@@ -57,7 +21,7 @@ async function sendVersion(page: Page) {
 }
 
 async function openForReview(page: Page) {
-  await switchUser(page, 'reviewer')
+  await page.getByRole('button', { name: 'Проверяющий', exact: true }).click()
   await page.getByRole('button', { name: 'Открыть РВ-2026-0147', exact: true }).click()
   await page.getByRole('button', { name: 'Принять к рассмотрению', exact: true }).click()
 }
@@ -65,7 +29,7 @@ async function openForReview(page: Page) {
 test('one prominent progress ring, milestones in instructions, required-field gating and private initial draft', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
-  await openPrototype(page)
+  await page.goto('/prototype')
   await expect(page.getByRole('heading', { name: 'Финансовый профиль', exact: true })).toBeVisible()
   await expect(page.getByText('Добрый день, Алексей', { exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Помощь', exact: true })).toHaveCount(0)
@@ -77,11 +41,11 @@ test('one prominent progress ring, milestones in instructions, required-field ga
   for (const name of ['Иванов Иван Иванович', 'Петров Петр Сергеевич']) await expect(page.locator('.fp-sidebar-contacts').getByText(name, { exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Инструкция по заполнению', exact: true }).click()
   for (const value of ['10%', '30%', '50%', '70%', '90%']) await expect(page.locator('.fp-instruction-stages').getByText(value, { exact: true })).toBeVisible()
-  await switchUser(page, 'reviewer')
+  await page.getByRole('button', { name: 'Проверяющий', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Помощь', exact: true })).toHaveCount(0)
   await expect(page.locator('.fp-table')).not.toContainText('Ковалёв Алексей Сергеевич')
   await expect(page.getByRole('navigation').getByRole('button', { name: 'Карточка резервиста' })).toBeDisabled()
-  await switchUser(page, 'reservist')
+  await page.getByRole('button', { name: 'Резервист', exact: true }).click()
   await nav(page, 'Выплаты и меры')
   await expect(page.locator('.fp-category-row')).toHaveCount(10)
   for (const name of ['Страховые выплаты', 'Пенсии и социальные выплаты', 'Материальная помощь', 'Жилищные меры']) await expect(page.locator('.fp-category-row').filter({ hasText: name })).toBeVisible()
@@ -95,13 +59,13 @@ test('one prominent progress ring, milestones in instructions, required-field ga
   await expect(page.locator('.fp-check-row.error')).toHaveCount(0)
   await sendVersion(page)
   await expect(page.getByRole('heading', { name: 'Версия передана на рассмотрение' })).toBeVisible()
-  await switchUser(page, 'reviewer')
+  await page.getByRole('button', { name: 'Проверяющий', exact: true }).click()
   await expect(page.locator('.fp-table')).toContainText('Ковалёв Алексей Сергеевич')
   expect(errors).toEqual([])
 })
 
 test('No collapses conditional data; pension documents are not requested; housing supports planned state', async ({ page }) => {
-  await openPrototype(page)
+  await page.goto('/prototype')
   await nav(page, 'Родство и получатели')
   await page.locator('.fp-question').first().getByRole('button', { name: 'Нет', exact: true }).click()
   await expect(page.getByLabel('ФИО родственника', { exact: true })).toHaveCount(0)
@@ -122,7 +86,7 @@ test('No collapses conditional data; pension documents are not requested; housin
 })
 
 test('each signal has its own evidence and later payment date is not automatically a service violation', async ({ page }) => {
-  await openPrototype(page)
+  await page.goto('/prototype')
   await finishRequiredFields(page)
   await sendVersion(page)
   await openForReview(page)
@@ -140,21 +104,21 @@ test('each signal has its own evidence and later payment date is not automatical
 })
 
 test('clarification draft and reply stay private until resubmission; completion requires human basis', async ({ page }) => {
-  await openPrototype(page)
+  await page.goto('/prototype')
   await finishRequiredFields(page)
   await sendVersion(page)
   await openForReview(page)
   await page.getByRole('button', { name: 'Сопоставить', exact: true }).click()
   await page.getByLabel('Комментарий и вопрос резервисту', { exact: true }).fill('Уточните основание компенсации за родственника, повторную запись Н-42 и условия преподавательского договора.')
   await page.getByRole('button', { name: 'Запросить уточнение', exact: true }).click()
-  await switchUser(page, 'reservist')
+  await page.getByRole('button', { name: 'Резервист', exact: true }).click()
   await nav(page, 'Уточнения')
   await page.getByLabel('Пояснение резервиста', { exact: true }).fill('Личное пояснение новой версии: связал выплату с родственником, убрал повторную запись и сверил договор.')
   for (const checkbox of await page.getByRole('checkbox').all()) await checkbox.check()
   await page.getByRole('button', { name: 'Подготовить версию 2', exact: true }).click()
   await nav(page, 'Профиль и служба')
   await page.getByLabel('Электронная почта', { exact: true }).fill('updated@reservist.example')
-  await switchUser(page, 'reviewer')
+  await page.getByRole('button', { name: 'Проверяющий', exact: true }).click()
   const row = page.getByRole('row').filter({ hasText: 'РВ-2026-0147' })
   await expect(row).toContainText('Версия 1')
   await expect(row).not.toContainText('Уточнённая версия')
@@ -165,7 +129,7 @@ test('clarification draft and reply stay private until resubmission; completion 
   await expect(page.getByText('2 580 000', { exact: false })).toBeVisible()
   await expect(page.locator('.fp-person-contacts')).toContainText('kovalev@reservist.example')
   await expect(page.locator('.fp-person-contacts')).not.toContainText('updated@reservist.example')
-  await switchUser(page, 'reservist')
+  await page.getByRole('button', { name: 'Резервист', exact: true }).click()
   await nav(page, 'Самопроверка')
   await sendVersion(page)
   await openForReview(page)
@@ -182,12 +146,12 @@ test('clarification draft and reply stay private until resubmission; completion 
   await expect(page.getByRole('heading', { name: 'Рассмотрение завершено', exact: true })).toBeVisible()
   await nav(page, 'Версии и журнал')
   await expect(page.locator('.fp-audit-table')).not.toContainText('личный черновик')
-  await switchUser(page, 'reservist')
+  await page.getByRole('button', { name: 'Резервист', exact: true }).click()
   await expect(page.locator('.fp-person-labels .fp-badge')).toHaveText('Рассмотрение завершено')
 })
 
 test('contact and programme edits persist locally but do not change the presented snapshot', async ({ page }) => {
-  await openPrototype(page)
+  await page.goto('/prototype')
   await nav(page, 'Профиль и служба')
   await expect(page.getByLabel('Наименование региональной программы', { exact: true })).toHaveValue('Герои Липецкой земли')
   await expect(page.getByLabel('Год региональной программы', { exact: true })).toHaveValue('2025')
@@ -204,7 +168,7 @@ test('contact and programme edits persist locally but do not change the presente
   await openForReview(page)
   await expect(page.locator('.fp-person-contacts')).toContainText('presented@reservist.example')
   await expect(page.locator('.fp-case-facts')).toContainText('Федеральный орган исполнительной власти')
-  await switchUser(page, 'reservist')
+  await page.getByRole('button', { name: 'Резервист', exact: true }).click()
   await nav(page, 'Профиль и служба')
   await page.getByLabel('Мобильный телефон', { exact: true }).fill('+7 (000) 000-02-48')
   await page.getByLabel('Электронная почта', { exact: true }).fill('private@reservist.example')
@@ -212,7 +176,7 @@ test('contact and programme edits persist locally but do not change the presente
   await page.getByLabel('Год региональной программы', { exact: true }).fill('2026')
   await page.getByLabel('Регион', { exact: true }).fill('Учебный регион нового черновика')
   await page.getByLabel('Предполагаемый орган назначения', { exact: true }).selectOption('Не указан')
-  await switchUser(page, 'reviewer')
+  await page.getByRole('button', { name: 'Проверяющий', exact: true }).click()
   const row = page.getByRole('row').filter({ hasText: 'РВ-2026-0147' })
   await expect(row).toContainText('Герои Липецкой земли')
   await expect(row).not.toContainText('Учебная программа нового черновика')
@@ -225,7 +189,7 @@ test('contact and programme edits persist locally but do not change the presente
 })
 
 test('repeat selfcheck recalculates partial completeness without reload or lost data and stays private', async ({ page }) => {
-  await openPrototype(page)
+  await page.goto('/prototype')
   await page.evaluate(() => { document.documentElement.dataset.selfcheckToken = 'same-page' })
   await nav(page, 'Самопроверка')
   await expect(page.getByLabel('Готово 4 из 6 блоков', { exact: true })).toBeVisible()
@@ -257,13 +221,13 @@ test('repeat selfcheck recalculates partial completeness without reload or lost 
   await expect(page.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '90')
   await nav(page, 'Самопроверка')
   await sendVersion(page)
-  await switchUser(page, 'reviewer')
+  await page.getByRole('button', { name: 'Проверяющий', exact: true }).click()
   await nav(page, 'Версии и журнал')
   await expect(page.locator('.fp-audit-table')).not.toContainText('Повторная самопроверка')
 })
 
 test('reviewed and unreviewed statuses reflect comment-backed actions with retained explanations', async ({ page }) => {
-  await openPrototype(page)
+  await page.goto('/prototype')
   await finishRequiredFields(page)
   await sendVersion(page)
   await openForReview(page)
@@ -296,7 +260,7 @@ test('reviewed and unreviewed statuses reflect comment-backed actions with retai
 
 test('mobile profile, payment categories and selfcheck do not overflow', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
-  await openPrototype(page)
+  await page.goto('/prototype')
   for (const name of ['Главная', 'Профиль и служба', 'Выплаты и меры', 'Самопроверка']) {
     if (name !== 'Главная') {
       await page.getByRole('button', { name: 'Открыть меню', exact: true }).click()

@@ -54,18 +54,8 @@ type Signal = { id: string; rule_id: string; title: string; explanation: string;
 type Message = { id: string; author_role: string; author_name: string; kind: string; text: string; created_at: string }
 type Contact = { id: string; name: string; responsibility: string; phone: string; email: string }
 type QueueItem = { profile_id: string; full_name: string; program: string; status: string; progress: number; submitted_at: string | null; pending_signals: number; reviewer_name: string }
-type IncomeSummary = {
-  currency: string
-  total: string
-  records: number
-  by_category: { category: string; total: string }[]
-}
-type AuditEvent = { id: string; actor_name: string; actor_role: string; action: string; created_at: string }
-type DiffEntry = { path: string; before: unknown; after: unknown }
-type VersionDiff = { version_from: number; version_to: number; changed: number; entries: DiffEntry[] }
 type ReviewerProfile = {
   profile_id: string; full_name: string; status: string; pending_signals: number; assigned_reviewer: string
-  income_summary: IncomeSummary
   version: Version & { snapshot: Record<string, any> }
   signals: Signal[]; messages: Message[]
   reviews: { id: string; result: string; basis_text: string; comment: string; author_name: string; created_at: string }[]
@@ -99,41 +89,6 @@ const WORK_STATUS: [string, string][] = [
 ]
 const EDITABLE = ['draft', 'clarification']
 const status = (s: string) => STATUS_RU[s] || s
-
-function diffValue(value: unknown): string {
-  if (value === null || value === undefined || value === '') return '—'
-  if (typeof value === 'object') return JSON.stringify(value)
-  return String(value)
-}
-
-function DiffPanel({ diff, title }: { diff: VersionDiff | null; title: string }) {
-  return (
-    <Panel title={title}>
-      {!diff ? <p className="muted">Выберите версии и нажмите «Сравнить».</p> : (
-        <>
-          <p className="muted">Версия {diff.version_from} → версия {diff.version_to}: изменено полей — {diff.changed}.</p>
-          {!diff.entries.length && <p>Существенных изменений нет.</p>}
-          {!!diff.entries.length && (
-            <div className="table-scroll">
-              <table>
-                <thead><tr><th>Путь</th><th>Было</th><th>Стало</th></tr></thead>
-                <tbody>
-                  {diff.entries.map((entry, index) => (
-                    <tr key={`${entry.path}-${index}`}>
-                      <td><code>{entry.path}</code></td>
-                      <td>{diffValue(entry.before)}</td>
-                      <td>{diffValue(entry.after)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </>
-      )}
-    </Panel>
-  )
-}
 
 function downloadJson(data: unknown, name: string) {
   const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }))
@@ -180,32 +135,21 @@ function ReservistView({ toast }: { toast: (m: string) => void }) {
   const [signals, setSignals] = useState<Signal[]>([])
   const [messages, setMessages] = useState<Message[]>([])
   const [contacts, setContacts] = useState<Contact[]>([])
-  const [audit, setAudit] = useState<AuditEvent[]>([])
-  const [diff, setDiff] = useState<VersionDiff | null>(null)
-  const [diffFrom, setDiffFrom] = useState('')
-  const [diffTo, setDiffTo] = useState('')
   const [error, setError] = useState('')
   const [reply, setReply] = useState('')
   const [docKind, setDocKind] = useState('diploma')
 
   const editable = !!draft && EDITABLE.includes(draft.status)
   const load = async () => {
-    const [d, c, v, s, ms, ct, au] = await Promise.all([
+    const [d, c, v, s, ms, ct] = await Promise.all([
       api<Draft>('/profile'),
       api<Completeness>('/profile/completeness'),
       api<Version[]>('/profile/versions'),
       api<Signal[]>('/profile/signals'),
       api<Message[]>('/profile/messages'),
-      api<Contact[]>('/reference/contacts'),
-      api<AuditEvent[]>('/profile/audit')
+      api<Contact[]>('/reference/contacts')
     ])
-    setDraft(d); setComp(c); setVersions(v); setSignals(s); setMessages(ms); setContacts(ct); setAudit(au)
-    setDiffFrom(v.length > 1 ? String(v[v.length - 2].number) : String(v[0]?.number || ''))
-    setDiffTo(String(v[v.length - 1]?.number || ''))
-  }
-  const loadDiff = async () => {
-    if (!diffFrom || !diffTo) return
-    setDiff(await api<VersionDiff>(`/profile/versions/${diffFrom}/diff/${diffTo}`))
+    setDraft(d); setComp(c); setVersions(v); setSignals(s); setMessages(ms); setContacts(ct)
   }
   useEffect(() => { load().catch((e) => setError(e.message)) }, [])
 
@@ -214,66 +158,13 @@ function ReservistView({ toast }: { toast: (m: string) => void }) {
       .then(async () => { await load(); if (ok) toast(ok) })
       .catch((e) => setError(e.message))
 
-  // Точечные обновления — без load(): полная перезагрузка затирает
-  // несохранённые правки черновика.
-  const addDoc = async (f: File, kind: string) => {
-    try {
-      const body = new FormData()
-      body.append('file', f)
-      body.append('kind', kind)
-      const doc = await api<Doc>('/profile/documents', { method: 'POST', body })
-      setDraft((d) => d && { ...d, documents: [...d.documents.filter((x) => x.id !== doc.id), doc] })
-      setComp(await api<Completeness>('/profile/completeness'))
-      toast('Документ загружен')
-    } catch (e) {
-      setError((e as Error).message)
-    }
-  }
-  const removeDoc = async (id: string) => {
-    try {
-      await api(`/profile/documents/${id}`, { method: 'DELETE' })
-      setDraft((d) => d && { ...d, documents: d.documents.filter((x) => x.id !== id) })
-      setComp(await api<Completeness>('/profile/completeness'))
-    } catch (e) {
-      setError((e as Error).message)
-    }
-  }
-  const postReply = async (text: string) => {
-    try {
-      const msg = await api<Message>('/profile/messages', { method: 'POST', body: JSON.stringify({ text }) })
-      setMessages((m) => [...m, msg])
-      setReply('')
-    } catch (e) {
-      setError((e as Error).message)
-    }
-  }
-
-  // Полная копия: вложенные массивы/объекты не должны изменяться в состоянии
-  // напрямую — иначе React batching перезаписывает быстрые последовательные
-  // правки (например, ответы по десяти категориям выплат).
-  const upd = (fn: (d: Draft) => void) => setDraft((d) => {
-    if (!d) return d
-    const c = structuredClone(d)
-    fn(c)
-    return c
-  })
+  const upd = (fn: (d: Draft) => void) => setDraft((d) => { if (!d) return d; const c = { ...d }; fn(c); return c })
   const setPerson = (k: keyof Person, v: string | number | null) => upd((d) => { d.person = { ...d.person, [k]: v } })
   const setProgram = (k: keyof Program, v: string | number | null) => upd((d) => { d.program = { ...d.program, [k]: v } })
   const setList = <T,>(key: 'service_periods' | 'activities', fn: (rows: T[]) => T[]) =>
     upd((d) => { (d[key] as T[]) = fn(d[key] as T[]) })
   const setBlock = (cat: string, fn: (b: Block) => void) =>
-    upd((d) => {
-      let b = d.payments.find((x) => x.category === cat)
-      if (!b) {
-        b = { category: cat, answer: null, records: [] }
-        d.payments.push(b)
-      }
-      fn(b)
-    })
-  // Новый профиль приходит с пустым списком блоков — показываем все 10
-  // категорий, чтобы пользователь мог ответить до первого сохранения.
-  const paymentBlocks = CATEGORIES.map(([cat]) =>
-    draft?.payments.find((x) => x.category === cat) || { category: cat, answer: null, records: [] } as Block)
+    upd((d) => { const b = d.payments.find((x) => x.category === cat); if (b) fn(b) })
 
   if (!draft) return error ? <Notice warning>{error}</Notice> : <Panel><div className="empty"><p>Загрузка профиля…</p></div></Panel>
 
@@ -409,7 +300,7 @@ function ReservistView({ toast }: { toast: (m: string) => void }) {
       </Panel>
 
       <Panel title="Выплаты и меры поддержки">
-        {paymentBlocks.map((b) => (
+        {draft.payments.map((b) => (
           <div key={b.category} className="panel" style={{ marginBottom: 12 }}>
             <div className="panel-body">
               <div className="form-row" style={{ alignItems: 'center' }}>
@@ -432,11 +323,6 @@ function ReservistView({ toast }: { toast: (m: string) => void }) {
                     <label>Период с<input disabled={!editable} type="date" value={r.period_from || ''} onChange={(e) => setBlock(b.category, (x) => { x.records[i].period_from = e.target.value || null })} /></label>
                     <label>по<input disabled={!editable} type="date" value={r.period_to || ''} onChange={(e) => setBlock(b.category, (x) => { x.records[i].period_to = e.target.value || null })} /></label>
                     <label>Сумма<input disabled={!editable} value={r.amount || ''} onChange={(e) => setBlock(b.category, (x) => { x.records[i].amount = e.target.value || null })} /></label>
-                    <label>Форма
-                      <select disabled={!editable} value={r.form} onChange={(e) => setBlock(b.category, (x) => { x.records[i].form = e.target.value })}>
-                        <option value="">—</option><option value="monetary">Денежная</option><option value="in_kind">Неденежная</option>
-                      </select>
-                    </label>
                   </div>
                   <div className="form-row">
                     <label>Документ-основание<input disabled={!editable} value={r.document_ref} onChange={(e) => setBlock(b.category, (x) => { x.records[i].document_ref = e.target.value })} placeholder="Реквизиты документа" /></label>
@@ -494,7 +380,11 @@ function ReservistView({ toast }: { toast: (m: string) => void }) {
             <Upload size={15} /> Загрузить
             <input type="file" style={{ display: 'none' }} accept=".json,.xlsx,.pdf,.docx" onChange={(e) => {
               const f = e.target.files?.[0]
-              if (f) void addDoc(f, docKind)
+              if (!f) return
+              const body = new FormData()
+              body.append('file', f)
+              body.append('kind', docKind)
+              run(() => api('/profile/documents', { method: 'POST', body }).then(() => {}), 'Документ загружен')
               e.target.value = ''
             }} />
           </span>
@@ -505,7 +395,7 @@ function ReservistView({ toast }: { toast: (m: string) => void }) {
           <div key={d.id} className="document">
             <FileText size={16} />
             <span style={{ flex: 1 }}>{d.filename} <small className="muted">· {DOC_KINDS.find(([k]) => k === d.kind)?.[1] || d.kind}</small></span>
-            {editable && <button className="icon-button" aria-label="Удалить" onClick={() => void removeDoc(d.id)}><Trash2 size={15} /></button>}
+            {editable && <button className="icon-button" aria-label="Удалить" onClick={() => run(() => api(`/profile/documents/${d.id}`, { method: 'DELETE' }).then(() => {}))}><Trash2 size={15} /></button>}
           </div>
         ))}
       </Panel>
@@ -518,35 +408,8 @@ function ReservistView({ toast }: { toast: (m: string) => void }) {
               <span style={{ flex: 1 }}>Версия {v.number} · {status(v.status)} · {dateText(v.created_at)}</span>
             </div>
           ))}
-          {versions.length > 1 && (
-            <div className="form-row" style={{ alignItems: 'end', marginTop: 14 }}>
-              <label style={{ flex: 1 }}>Сравнить с версии
-                <select value={diffFrom} onChange={(e) => { setDiffFrom(e.target.value); setDiff(null) }}>
-                  {versions.map((v) => <option key={v.id} value={v.number}>Версия {v.number}</option>)}
-                </select>
-              </label>
-              <label style={{ flex: 1 }}>И версией
-                <select value={diffTo} onChange={(e) => { setDiffTo(e.target.value); setDiff(null) }}>
-                  {versions.map((v) => <option key={v.id} value={v.number}>Версия {v.number}</option>)}
-                </select>
-              </label>
-              <button className="secondary" disabled={!diffFrom || !diffTo || diffFrom === diffTo} onClick={() => void loadDiff()}>Сравнить</button>
-            </div>
-          )}
         </Panel>
       )}
-
-      {!!versions.length && <DiffPanel diff={diff} title="Что изменилось между версиями" />}
-
-      {draft.status === 'clarification' && (() => {
-        const reason = [...messages].reverse().find((m) => m.author_role !== 'reservist')
-        return (
-          <div className="notice warning clarification-reason">
-            <MessageSquare size={18} />
-            <div><b>Причина уточнения</b><p>{reason?.text || 'Проверяющий запросил уточнение сведений.'}</p></div>
-          </div>
-        )
-      })()}
 
       {!!signals.length && (
         <Panel title="Несоответствия по представленным сведениям">
@@ -576,7 +439,7 @@ function ReservistView({ toast }: { toast: (m: string) => void }) {
           {draft.status !== 'completed' && draft.status !== 'removed' && (
             <div className="form-row" style={{ alignItems: 'end' }}>
               <label style={{ flex: 1 }}>Ответ<input value={reply} onChange={(e) => setReply(e.target.value)} placeholder="Ответ на вопросы проверяющего" /></label>
-              <button className="secondary" disabled={!reply.trim()} onClick={() => void postReply(reply)}><Send size={15} /> Отправить</button>
+              <button className="secondary" disabled={!reply.trim()} onClick={() => run(() => api('/profile/messages', { method: 'POST', body: JSON.stringify({ text: reply }) }).then(() => { setReply('') }))}><Send size={15} /> Отправить</button>
             </div>
           )}
         </Panel>
@@ -592,17 +455,6 @@ function ReservistView({ toast }: { toast: (m: string) => void }) {
           ))}
         </Panel>
       )}
-
-      {!!audit.length && (
-        <Panel title="Журнал действий">
-          {audit.map((a) => (
-            <div key={a.id} className="document">
-              <span style={{ flex: 1 }}><b>{a.action}</b> <small className="muted">· {a.actor_name}</small></span>
-              <span className="muted">{dateText(a.created_at)}</span>
-            </div>
-          ))}
-        </Panel>
-      )}
     </>
   )
 }
@@ -613,10 +465,6 @@ function ReviewerView({ toast }: { toast: (m: string) => void }) {
   const [queue, setQueue] = useState<QueueItem[]>([])
   const [filter, setFilter] = useState('')
   const [card, setCard] = useState<ReviewerProfile | null>(null)
-  const [versions, setVersions] = useState<Version[]>([])
-  const [selectedVersion, setSelectedVersion] = useState('')
-  const [reviewDiff, setReviewDiff] = useState<VersionDiff | null>(null)
-  const [audit, setAudit] = useState<AuditEvent[]>([])
   const [error, setError] = useState('')
   const [comment, setComment] = useState('')
   const [basis, setBasis] = useState('')
@@ -624,27 +472,7 @@ function ReviewerView({ toast }: { toast: (m: string) => void }) {
   const [signalComments, setSignalComments] = useState<Record<string, string>>({})
 
   const loadQueue = async () => setQueue(await api<QueueItem[]>(`/reviewer/queue${filter ? `?status=${filter}` : ''}`))
-  const loadCard = async (id: string, version?: number) => {
-    const suffix = version ? `?version=${version}` : ''
-    const [profile, list, events] = await Promise.all([
-      api<ReviewerProfile>(`/reviewer/profiles/${id}${suffix}`),
-      api<Version[]>(`/reviewer/profiles/${id}/versions`),
-      api<AuditEvent[]>(`/reviewer/profiles/${id}/audit`)
-    ])
-    setCard(profile); setVersions(list); setAudit(events)
-    setSelectedVersion(String(profile.version.number))
-    setReviewDiff(null)
-  }
-  const openVersion = async (id: string, version: string) => {
-    try {
-      await loadCard(id, version ? Number(version) : undefined)
-    } catch (e) { setError((e as Error).message) }
-  }
-  const loadReviewDiff = async () => {
-    if (!card) return
-    try { setReviewDiff(await api<VersionDiff>(`/reviewer/profiles/${card.profile_id}/diff`)) }
-    catch (e) { setError((e as Error).message); setReviewDiff(null) }
-  }
+  const loadCard = async (id: string) => setCard(await api<ReviewerProfile>(`/reviewer/profiles/${id}`))
   useEffect(() => { loadQueue().catch((e) => setError(e.message)) }, [filter])
   const run = (fn: () => Promise<void>, ok = '') =>
     fn().then(async () => {
@@ -672,26 +500,10 @@ function ReviewerView({ toast }: { toast: (m: string) => void }) {
             <p>{snap.program?.regional_program || snap.program?.flow} · назначен: {card.assigned_reviewer || '—'}</p>
           </div>
           <div className="actions">
-            <label>Версия
-              <select value={selectedVersion} onChange={(e) => void openVersion(card.profile_id, e.target.value)}>
-                {versions.map((v) => <option key={v.id} value={v.number}>Версия {v.number} · {status(v.status)}</option>)}
-              </select>
-            </label>
             <button className="secondary" onClick={() => setCard(null)}><X size={16} /> К очереди</button>
             <button className="secondary" onClick={() => run(async () => { const data = await api(`/reviewer/profiles/${card.profile_id}/export`); downloadJson(data, `profile-${card.version.number}.json`) })}><Download size={16} /> JSON</button>
-            <button className="secondary" onClick={() => window.print()}><FileText size={16} /> Печать</button>
           </div>
         </div>
-
-        {card.status === 'clarification' && (() => {
-          const reason = [...card.messages].reverse().find((m) => m.author_role !== 'reservist')
-          return (
-            <div className="notice warning clarification-reason">
-              <MessageSquare size={18} />
-              <div><b>Причина уточнения</b><p>{reason?.text || 'Требуется уточнение представленных сведений.'}</p></div>
-            </div>
-          )
-        })()}
 
         <Panel title="Представленные сведения (слепок версии)">
           <div className="info-grid">
@@ -718,37 +530,6 @@ function ReviewerView({ toast }: { toast: (m: string) => void }) {
             </div>
           ))}
         </Panel>
-
-        <Panel title="Сведения о доходах">
-          <div className="info-grid">
-            <div><small>Денежные поступления</small><b>{card.income_summary?.total ?? '0.00'} {card.income_summary?.currency || 'RUB'}</b></div>
-            <div><small>Записей в сумме</small><b>{card.income_summary?.records ?? 0}</b></div>
-          </div>
-          {!!card.income_summary?.by_category.length && (
-            <table>
-              <thead><tr><th>Категория</th><th>Сумма</th></tr></thead>
-              <tbody>
-                {card.income_summary.by_category.map((c) => (
-                  <tr key={c.category}>
-                    <td>{CATEGORIES.find(([k]) => k === c.category)?.[1] || c.category}</td>
-                    <td>{c.total} {card.income_summary.currency}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-          <p className="muted">Учитываются только денежные выплаты; неденежные меры и выплаты «в натуре» в сумму не входят.</p>
-        </Panel>
-
-        <Panel title="История версий">
-          <p className="muted">Доступны все опубликованные версии. Сравнение показывает изменения между двумя последними.</p>
-          <div className="actions">
-            {versions.map((v) => <button key={v.id} className={String(v.number) === selectedVersion ? '' : 'secondary'} onClick={() => void openVersion(card.profile_id, String(v.number))}>Версия {v.number}</button>)}
-            <button className="secondary" disabled={versions.length < 2} onClick={() => void loadReviewDiff()}>Сравнить последние версии</button>
-          </div>
-          {versions.length < 2 && <p className="muted">Для сравнения нужны минимум две опубликованные версии.</p>}
-        </Panel>
-        {!!reviewDiff && <DiffPanel diff={reviewDiff} title="Изменения между версиями" />}
 
         <Panel title={`Несоответствия (${card.pending_signals} новых)`}>
           {!card.signals.length && <p className="muted">Несоответствий нет — детерминированные проверки пройдены.</p>}
@@ -810,34 +591,6 @@ function ReviewerView({ toast }: { toast: (m: string) => void }) {
             </div>
           )}
         </Panel>
-
-        {!!audit.length && (
-          <Panel title="Журнал рассмотрения">
-            {audit.map((a) => (
-              <div key={a.id} className="document">
-                <span style={{ flex: 1 }}><b>{a.action}</b> <small className="muted">· {a.actor_name}</small></span>
-                <span className="muted">{dateText(a.created_at)}</span>
-              </div>
-            ))}
-          </Panel>
-        )}
-
-        <section className="print-report">
-          <h1>Сведения о доходах</h1>
-          <p><b>Резервист:</b> {card.full_name}</p>
-          <p><b>Версия:</b> {card.version.number} · {status(card.status)} · {dateText(card.version.created_at)}</p>
-          <p><b>Программа:</b> {snap.program?.regional_program || snap.program?.flow || '—'}</p>
-          <table>
-            <thead><tr><th>Категория</th><th>Сумма, {card.income_summary?.currency || 'RUB'}</th></tr></thead>
-            <tbody>
-              {(card.income_summary?.by_category || []).map((c) => (
-                <tr key={c.category}><td>{CATEGORIES.find(([k]) => k === c.category)?.[1] || c.category}</td><td>{c.total}</td></tr>
-              ))}
-              <tr><td><b>Итого денежные записи</b></td><td><b>{card.income_summary?.total || '0.00'}</b></td></tr>
-            </tbody>
-          </table>
-          <p>Неденежные меры, записи в натуральной форме и выплаты «в натуре» в сумму не включены. Документ сформирован из представленной версии профиля; юридическое решение о назначении принимается вне платформы.</p>
-        </section>
       </>
     )
   }

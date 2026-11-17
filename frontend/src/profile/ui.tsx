@@ -191,7 +191,7 @@ export function UploadBox({
   label: string
   error?: boolean
   optional?: boolean
-  onUpload?: (name: string, file?: File) => void
+  onUpload?: (name: string) => void
 }) {
   return (
     <label className={`fp-upload ${error ? 'fp-upload-error' : ''}`}>
@@ -216,7 +216,7 @@ export function UploadBox({
         accept=".pdf,.doc,.docx"
         onChange={(e) => {
           const file = e.target.files?.[0]
-          if (file) onUpload?.(file.name, file)
+          if (file) onUpload?.(file.name)
         }}
       />
     </label>

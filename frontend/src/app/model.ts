@@ -29,11 +29,11 @@ export function useAppModel() {
   const archived = !!currentRun && currentRun.id !== detail?.runs[0]?.id
 
   useEffect(() => {
-    api<{ authenticated: boolean; user: Me | null }>('/auth/session')
-      .then((r) => {
-        if (r.user) setUser(r.user)
+    api<Me>('/auth/me')
+      .then((r) => setUser(r))
+      .catch((e) => {
+        if (!(e instanceof ApiError && e.status === 401)) setError(e.message)
       })
-      .catch((e) => setError(e.message))
       .finally(() => setBoot(false))
   }, [])
   useEffect(() => {

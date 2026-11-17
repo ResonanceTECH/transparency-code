@@ -29,7 +29,6 @@ import {
   Send,
   ShieldCheck,
   SlidersHorizontal,
-  Trash2,
   Upload,
   UserRound,
   UsersRound,
@@ -271,17 +270,7 @@ export function HomeScreen(m: ProfileModel) {
 }
 
 export function ProfileScreen(m: ProfileModel) {
-  const {
-    candidate,
-    setToast,
-    navigate,
-    showDocument,
-    updateCandidate,
-    servicePeriods,
-    addServicePeriod,
-    updateServicePeriod,
-    removeServicePeriod
-  } = m
+  const { candidate, setToast, navigate, showDocument, updateCandidate } = m
   return (
     <div className="fp-columns fp-form-columns">
       <div className="fp-stack">
@@ -395,7 +384,7 @@ export function ProfileScreen(m: ProfileModel) {
             action={
               <button
                 className="fp-button fp-button-outline"
-                onClick={addServicePeriod}
+                onClick={() => setToast('В макете показаны подготовленные учебные периоды')}
               >
                 <Plus size={15} />
                 Добавить период
@@ -430,35 +419,6 @@ export function ProfileScreen(m: ProfileModel) {
             </div>
             <Badge tone="teal">Заполнено</Badge>
           </div>
-          {servicePeriods.map((period) => (
-            <div className="fp-crud-row" key={period.id}>
-              <Field
-                label="Вид службы"
-                value={period.kind}
-                onChange={(value) => updateServicePeriod(period.id, 'kind', value)}
-                wide
-              />
-              <Field
-                label="Начало"
-                type="date"
-                value={period.start}
-                onChange={(value) => updateServicePeriod(period.id, 'start', value)}
-              />
-              <Field
-                label="Окончание"
-                type="date"
-                value={period.end}
-                onChange={(value) => updateServicePeriod(period.id, 'end', value)}
-              />
-              <button
-                className="fp-icon-button"
-                aria-label="Удалить период"
-                onClick={() => removeServicePeriod(period.id)}
-              >
-                <Trash2 size={16} />
-              </button>
-            </div>
-          ))}
           <small className="fp-footnote">
             Виды службы: военная, государственная, иное. Категории: младший, старший, высший офицерский состав
             или волонтёр.
@@ -501,17 +461,7 @@ export function ProfileScreen(m: ProfileModel) {
 }
 
 export function KinshipScreen(m: ProfileModel) {
-  const {
-    relativeAnswer,
-    setRelativeAnswer,
-    question,
-    navigate,
-    showDocument,
-    familyRecipients,
-    addRecipient,
-    updateRecipient,
-    removeRecipient
-  } = m
+  const { relativeAnswer, setRelativeAnswer, question, setToast, navigate, showDocument } = m
   return (
     <div className="fp-columns fp-form-columns">
       <div className="fp-stack">
@@ -583,34 +533,10 @@ export function KinshipScreen(m: ProfileModel) {
             required
             onPreview={showDocument}
           />
-          {familyRecipients.map((recipient) => (
-            <div className="fp-crud-row" key={recipient.id}>
-              <Field
-                label="ФИО получателя"
-                value={recipient.fullName}
-                onChange={(value) => updateRecipient(recipient.id, 'fullName', value)}
-                wide
-              />
-              <Field
-                label="Связь с кандидатом"
-                value={recipient.relation}
-                onChange={(value) => updateRecipient(recipient.id, 'relation', value)}
-              />
-              <Field
-                label="Год рождения"
-                value={recipient.year}
-                onChange={(value) => updateRecipient(recipient.id, 'year', value)}
-              />
-              <button
-                className="fp-icon-button"
-                aria-label="Удалить получателя"
-                onClick={() => removeRecipient(recipient.id)}
-              >
-                <Trash2 size={16} />
-              </button>
-            </div>
-          ))}
-          <button className="fp-text-button" onClick={addRecipient}>
+          <button
+            className="fp-text-button"
+            onClick={() => setToast('В макете показан один учебный получатель')}
+          >
             <Plus size={15} />
             Добавить сведения о другом получателе
           </button>
@@ -761,19 +687,8 @@ export function PaymentsScreen(m: ProfileModel) {
 }
 
 export function CategoryScreen(m: ProfileModel) {
-  const {
-    activeCategory,
-    categoryAnswers,
-    setCategoryAnswers,
-    question,
-    navigate,
-    showDocument,
-    records,
-    addRecord,
-    updateRecord,
-    removeRecord,
-    addAttachment
-  } = m
+  const { activeCategory, categoryAnswers, setCategoryAnswers, question, setToast, navigate, showDocument } =
+    m
   const category = categoryDefinitions[activeCategory]
   const answer = categoryAnswers[activeCategory] || category.answer
   const setAnswer = (value: string) =>
@@ -843,7 +758,7 @@ export function CategoryScreen(m: ProfileModel) {
                         <UploadBox
                           label="Дополнительное основание надбавки"
                           optional
-                          onUpload={addAttachment}
+                          onUpload={() => setToast('Дополнительное учебное вложение выбрано')}
                         />
                       </div>
                     )}
@@ -869,6 +784,13 @@ export function CategoryScreen(m: ProfileModel) {
                       required
                       onPreview={showDocument}
                     />
+                    <button
+                      className="fp-text-button"
+                      onClick={() => setToast('В макете показан один учебный получатель')}
+                    >
+                      <Plus size={15} />
+                      Добавить сведения о другом получателе
+                    </button>
                   </>
                 )}
                 {activeCategory === 7 && (
@@ -912,7 +834,7 @@ export function CategoryScreen(m: ProfileModel) {
                     </div>
                     <UploadBox
                       label="Документ неденежной меры"
-                      onUpload={addAttachment}
+                      onUpload={() => setToast('Учебное вложение выбрано')}
                     />
                     <Notice>
                       Можно указать даже небольшую меру. Значимость документа оценивает проверяющий, а не
@@ -921,41 +843,6 @@ export function CategoryScreen(m: ProfileModel) {
                   </>
                 )}
               </>
-            )}
-            {answer !== 'Нет' && activeCategory !== 5 && (
-              <div className="fp-crud-list">
-                {(records[activeCategory] || []).map((record) => (
-                  <div className="fp-crud-row" key={record.id}>
-                    <Field
-                      label="Наименование записи"
-                      value={record.title}
-                      onChange={(value) => updateRecord(activeCategory, record.id, 'title', value)}
-                      wide
-                    />
-                    <Field
-                      label="Сумма, ₽"
-                      value={record.amount}
-                      onChange={(value) => updateRecord(activeCategory, record.id, 'amount', value)}
-                    />
-                    <Field
-                      label="Основание"
-                      value={record.basis}
-                      onChange={(value) => updateRecord(activeCategory, record.id, 'basis', value)}
-                    />
-                    <button
-                      className="fp-icon-button"
-                      aria-label="Удалить запись"
-                      onClick={() => removeRecord(activeCategory, record.id)}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                ))}
-                <button className="fp-text-button" onClick={() => addRecord(activeCategory)}>
-                  <Plus size={15} />
-                  Добавить запись
-                </button>
-              </div>
             )}
           </Panel>
           <button className="fp-button" onClick={() => navigate('payments')}>
@@ -1404,16 +1291,7 @@ export function HousingScreen(m: ProfileModel) {
 }
 
 export function ActivitiesScreen(m: ProfileModel) {
-  const {
-    activityAnswer,
-    setActivityAnswer,
-    question,
-    showDocument,
-    activities,
-    addActivity,
-    updateActivity,
-    removeActivity
-  } = m
+  const { activityAnswer, setActivityAnswer, question, setToast, showDocument } = m
   return (
     <div className="fp-columns fp-form-columns">
       <div className="fp-stack">
@@ -1460,34 +1338,10 @@ export function ActivitiesScreen(m: ProfileModel) {
                 required
                 onPreview={showDocument}
               />
-              {activities.map((activity) => (
-                <div className="fp-crud-row" key={activity.id}>
-                  <Field
-                    label="Организация"
-                    value={activity.organization}
-                    onChange={(value) => updateActivity(activity.id, 'organization', value)}
-                    wide
-                  />
-                  <Field
-                    label="Вид деятельности"
-                    value={activity.kind}
-                    onChange={(value) => updateActivity(activity.id, 'kind', value)}
-                  />
-                  <Field
-                    label="Период"
-                    value={activity.period}
-                    onChange={(value) => updateActivity(activity.id, 'period', value)}
-                  />
-                  <button
-                    className="fp-icon-button"
-                    aria-label="Удалить деятельность"
-                    onClick={() => removeActivity(activity.id)}
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              ))}
-              <button className="fp-text-button" onClick={addActivity}>
+              <button
+                className="fp-text-button"
+                onClick={() => setToast('В макете показана одна учебная деятельность')}
+              >
                 <Plus size={15} />
                 Добавить деятельность
               </button>
@@ -1557,7 +1411,7 @@ export function ActivitiesScreen(m: ProfileModel) {
 }
 
 export function DocumentsScreen(m: ProfileModel) {
-  const { supportFile, documentCount, navigate, showDocument, attachments, addAttachment, removeAttachment } = m
+  const { supportFile, documentCount, navigate, showDocument } = m
   return (
     <>
       <Notice icon={<ShieldCheck size={19} />}>
@@ -1594,32 +1448,6 @@ export function DocumentsScreen(m: ProfileModel) {
                 </button>
               </div>
             )}
-            {attachments.map((attachment) => (
-              <div className="fp-file" key={attachment.id}>
-                <span className="fp-file-icon">
-                  <FileText size={21} />
-                </span>
-                <div>
-                  <strong>{attachment.name}</strong>
-                  <small>Добавлено пользователем</small>
-                </div>
-                <button
-                  className="fp-icon-button"
-                  aria-label={`Просмотреть ${attachment.name}`}
-                  onClick={() => showDocument(attachment.name)}
-                >
-                  <ChevronRight size={17} />
-                </button>
-                <button
-                  className="fp-icon-button"
-                  aria-label={`Удалить ${attachment.name}`}
-                  onClick={() => removeAttachment(attachment.id)}
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            ))}
-            <UploadBox label="Дополнительный документ основания" optional onUpload={addAttachment} />
           </div>
         </Panel>
         <div className="fp-stack">
@@ -1843,10 +1671,9 @@ export function SelfCheckScreen(m: ProfileModel) {
   )
 }
 
-export function QueueScreen(m: ProfileModel, onQuickLogin?: () => void) {
+export function QueueScreen(m: ProfileModel) {
   const {
     phase,
-    sent,
     candidate,
     presented,
     accepted,
@@ -2073,14 +1900,6 @@ export function QueueScreen(m: ProfileModel, onQuickLogin?: () => void) {
           <strong>Черновики не поступают в очередь.</strong>
           <br />
           Материал появляется только после отправки резервистом и назначения вам доступа.
-          {!sent && onQuickLogin && (
-            <div className="fp-queue-hint">
-              <span>Пока вы видите только учебные заглушки. Отправьте версию как резервист, чтобы открыть сценарий.</span>
-              <button className="fp-button fp-button-outline" onClick={onQuickLogin}>
-                <UserRound size={15} /> Войти как резервист
-              </button>
-            </div>
-          )}
         </Notice>
         <Panel>
           <PanelTitle title="Порядок приёма" />
