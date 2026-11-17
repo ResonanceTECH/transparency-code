@@ -27,7 +27,7 @@ def evaluate(ctx: RuleContext) -> list[CandidateSignal]:
     object_ids = sorted({f.get("object_id") or "" for f in sorted_facts(ctx, FIELD_INITIAL)})
     signals: list[CandidateSignal] = []
     for object_id in object_ids:
-        same_object = lambda f: (f.get("object_id") or "") == object_id  # noqa: E731
+        same_object = lambda f, oid=object_id: (f.get("object_id") or "") == oid  # noqa: E731
         initial_facts = [f for f in sorted_facts(ctx, FIELD_INITIAL) if same_object(f)]
         payment_facts = [f for f in sorted_facts(ctx, FIELD_PAYMENT) if same_object(f)]
         balance_facts = [f for f in sorted_facts(ctx, FIELD_BALANCE) if same_object(f)]

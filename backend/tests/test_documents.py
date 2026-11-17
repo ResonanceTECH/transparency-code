@@ -200,9 +200,10 @@ async def test_xlsx_and_marker_extraction(auth_client):
     assert resp.json()["status"] == "ready", resp.json()
 
     detail = (await auth_client.get(f"/api/cases/{case_id}")).json()
-    fields = {f["field"]: f["value"] for f in detail["facts"]}
-    assert fields["sale_amount"] == "555"
-    assert fields["obligation_balance"] == "300000"
+    by_object = {f["object_id"]: f["value"] for f in detail["facts"]}
+    assert by_object["flat-1"] == "777000"
+    assert by_object["x"] == "555"
+    assert by_object["loan-1"] == "300000"
 
 
 def _make_pdf(text: str) -> bytes:

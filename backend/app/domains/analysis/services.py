@@ -22,7 +22,7 @@ from app.domains.analysis.models import (
     SignalStatus,
 )
 from app.domains.analysis.rules import RULES, RULES_BY_ID, RuleContext
-from app.domains.analysis.schemas import DecisionIn, DecisionOut, RunOut, SignalOut
+from app.domains.analysis.schemas import DecisionIn, RunOut, SignalOut
 from app.domains.cases.events import record_event
 from app.domains.cases.models import Case
 from app.domains.documents.models import Fact
@@ -103,6 +103,9 @@ async def run_analysis(
     fact_dicts = _fact_dicts(facts)
     run = AnalysisRun(
         case_id=case.id,
+        # Явный timestamp с микросекундами: server_default CURRENT_TIMESTAMP даёт
+        # секундную точность — два быстрых запуска «слипались» бы в порядке runs.
+        created_at=datetime.now(UTC),
         rule_version=rule_version,
         enabled_rules=list(enabled_rules),
         input_hash=compute_input_hash(

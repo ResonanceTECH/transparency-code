@@ -17,7 +17,7 @@ def evaluate(ctx: RuleContext) -> list[CandidateSignal]:
     object_ids = sorted({f.get("object_id") or "" for f in expense_facts})
     signals: list[CandidateSignal] = []
     for object_id in object_ids:
-        same_object = lambda f: (f.get("object_id") or "") == object_id  # noqa: E731
+        same_object = lambda f, oid=object_id: (f.get("object_id") or "") == oid  # noqa: E731
         expenses = [f for f in expense_facts if same_object(f)]
         sources = [
             f
