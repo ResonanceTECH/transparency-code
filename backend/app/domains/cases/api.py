@@ -76,6 +76,33 @@ async def get_case(
 @router.post(
     "/cases/{case_id}/demo",
     response_model=CaseDetailOut,
+    summary="Добавить учебный комплект",
+    description=(
+        "Сидированные документы и поля по сценариям `trade_in`/`apartment`; "
+        "`clean=true` — комплект без нарушений. Документы `downloadable=false`."
+    ),
+    responses={**_NOT_FOUND, 422: {"model": ErrorOut, "description": "Неизвестный kind"}},
+)
+async def load_demo(
+    case_id: uuid.UUID,
+    kind: str = "trade_in",
+    clean: bool = False,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> CaseDetailOut:
+    case = await services.get_owned_case(db, user, case_id)
+    if case is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Дело не найдено")
+    await demo_services.load_demo(db, case, kind=kind, clean=clean, author=user.username)
+    await db.commit()
+    detail = await services.get_case_detail(db, user, case_id)
+    assert detail is not None
+    return detail
+
+
+@router.post(
+    "/cases/{case_id}/demo",
+    response_model=CaseDetailOut,
     summary="Наполнить демо-комплектом",
     description=(
         "Учебные «документы» и факты сценария `kind` (`trade_in`/`apartment`); "
