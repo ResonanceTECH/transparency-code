@@ -489,6 +489,42 @@ async def reviewer_profile(profile_id: uuid.UUID,
     )
 
 
+@router.get(
+    "/reviewer/profiles/{profile_id}/versions",
+    response_model=list[VersionOut], tags=["reviewer"],
+    summary="Все опубликованные версии профиля",
+    responses={k: v for k, v in _ERRORS.items() if k in (401, 403, 404)},
+)
+async def reviewer_versions(profile_id: uuid.UUID,
+                            user: User = Depends(require_reviewer),
+                            db: AsyncSession = Depends(get_db)):
+    profile = await _get_visible(db, profile_id)
+    return [VersionOut(id=v.id, number=v.number, status=v.status,
+                       progress=v.progress, created_at=v.created_at)
+            for v in profile.versions]
+
+
+@router.get(
+    "/reviewer/profiles/{profile_id}/diff",
+    response_model=VersionDiffOut, tags=["reviewer"],
+    summary="Изменения между двумя последними версиями",
+    description="Структурный diff снапшотов последней и предпоследней "
+                "версий — «что изменилось» при повторном представлении.",
+    responses={k: v for k, v in _ERRORS.items() if k in (401, 403, 404, 409)},
+)
+async def reviewer_diff(profile_id: uuid.UUID,
+                        user: User = Depends(require_reviewer),
+                        db: AsyncSession = Depends(get_db)):
+    profile = await _get_visible(db, profile_id)
+    if len(profile.versions) < 2:
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            "Для сравнения нужны минимум две версии")
+    base, target = profile.versions[-2], profile.versions[-1]
+    entries = diff_snapshots(base.snapshot, target.snapshot)
+    return VersionDiffOut(version_from=base.number, version_to=target.number,
+                          changed=len(entries), entries=entries)
+
+
 async def _assigned_name(db: AsyncSession, profile_id: uuid.UUID) -> str:
     from sqlalchemy import select
 
