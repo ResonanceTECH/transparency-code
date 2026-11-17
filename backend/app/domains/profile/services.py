@@ -418,7 +418,13 @@ async def get_visible_profile(db: AsyncSession, profile_id: uuid.UUID) -> Profil
     """Профиль, видимый проверяющему: есть хотя бы одна опубликованная версия."""
     profile = await db.scalar(
         _profile_query().where(Profile.id == profile_id))
-    if profile is None or not profile.versions:
+    if profile is None:
+        return None
+    # Перечитываем коллекции — в одной сессии identity-map отдаёт
+    # ранее загруженные (устаревшие) списки.
+    for attr in ("versions", "documents"):
+        await db.refresh(profile, [attr])
+    if not profile.versions:
         return None
     return profile
 
