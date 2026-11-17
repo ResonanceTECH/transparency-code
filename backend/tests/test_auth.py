@@ -2,11 +2,10 @@
 
 from datetime import UTC, datetime, timedelta
 
+from conftest import DEMO_PASSWORD
 from sqlalchemy import select
 
 from app.domains.identity.models import UserSession
-
-from conftest import DEMO_PASSWORD
 
 PASSWORD = DEMO_PASSWORD
 

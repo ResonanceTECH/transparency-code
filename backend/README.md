@@ -106,4 +106,19 @@ cp .env.example .env
 - `pyproject.toml`: `argon2-cffi>=23.1,<26`; ruff `extend-immutable-calls` для `fastapi.Depends` и др. (B008).
 - Проверено: `ruff` чист, `pytest` 9/9, uvicorn + curl на живом PostgreSQL — login/me/logout E2E OK.
 
-**Далее:** cases CRUD (`GET/POST /api/cases`, `GET /api/cases/{id}`) → documents pipeline → analysis/rules → signals/decisions → report → outbox-события.
+### Итерация 6 — SPEC v1.1 + cases-домен (17.11.2026)
+
+**SPEC.md → v1.1** (закрыты вопросы §11): evidence — слепок `Fact` в `signal_facts.fact_snapshot`; `pending_count` = сигналы последнего run со status ≠ resolved; `number` = `PR-<year>-<seq:04d>` (seq внутри года); формат событий «Короткое: детали»; маппинг имён API↔БД; `Cache-Control: no-store` обязателен; гигиена OpenAPI (summary/description/responses).
+
+- `signal_facts.fact_snapshot` (JSONB) — модель + миграция `50540a258aed` поверх `887add606ce1` (initial перегенерирован под старый revision id — цепочка и свежая БД корректны).
+- `analysis/services.py`: `compute_input_hash` — канонический SHA-256 снапшота (case meta + все факты по `id`); единственная точка формата, используется и для `stale`.
+- `documents/`: `FactOut`/`DocumentOut` DTO + `serialize_fact`/`serialize_document` — единый маппинг ORM→API (он же пишет `fact_snapshot`).
+- `analysis/schemas.py`: `RunOut`/`SignalOut`/`DecisionOut` + входные `AnalysisRunIn`/`DecisionIn`.
+- `cases/`: `CaseSummaryOut`/`CaseDetailOut`/`CaseCreateIn`/`EventOut`; сервисы — `list_cases` (метрики последнего run + stale пакетом), `create_case` (нумерация, событие), `get_case_detail` (evidence из слепка, fallback на живой факт); `record_event` — общая точка аудита.
+- `cases/api.py`: `GET /cases`, `POST /cases` (201), `GET /cases/{id}` (404 чужое/нет) — owner-изоляция, `synthetic=true` валидация.
+- `core/schemas.py`: `ErrorOut` для документированных 4xx в Swagger; summary/description/responses на всех эндпоинтах.
+- `main.py`: middleware `no-store` на `/api/*`.
+- `tests/conftest.py`: общие `demo_user`/`auth_client`; `test_cases.py` — 9 тестов (auth-гард, CRUD, нумерация, валидация 422, дефолт department, detail+события, 404, owner-изоляция); `test_auth.py` на общих фикстурах.
+- Проверено: `ruff` чист, `pytest` **18/18**, OpenAPI — теги/summary/enum'ы/коды ответов; uvicorn + живой PostgreSQL: login → create `PR-2025-0001` → list → detail → `no-store` — E2E OK.
+
+**Далее:** documents (upload/pipeline/facts) → `POST /cases/{id}/demo` → analysis (rules + runs) → signals/decisions → report → outbox-события.

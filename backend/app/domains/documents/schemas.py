@@ -1,7 +1,7 @@
 """Pydantic-схемы documents-домена: DTO документов и извлечённых фактов (SPEC.md §4–5)."""
 
 import uuid
-from datetime import date, datetime
+from datetime import date
 
 from pydantic import BaseModel
 

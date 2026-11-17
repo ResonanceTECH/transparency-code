@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.deps import get_db
+from app.core.schemas import ErrorOut
 from app.domains.identity import services
 from app.domains.identity.deps import get_current_user
 from app.domains.identity.models import User
@@ -17,8 +18,16 @@ from app.domains.identity.services import SESSION_COOKIE
 
 router = APIRouter(tags=["identity"])
 
+_UNAUTHORIZED = {401: {"model": ErrorOut, "description": "Требуется вход / неверные реквизиты"}}
 
-@router.post("/auth/login", response_model=UserOut)
+
+@router.post(
+    "/auth/login",
+    response_model=UserOut,
+    summary="Вход специалиста",
+    description="Проверяет логин/пароль, создаёт серверную сессию и ставит cookie `session`.",
+    responses=_UNAUTHORIZED,
+)
 async def login(
     payload: LoginIn, response: Response, db: AsyncSession = Depends(get_db)
 ) -> User:
@@ -43,12 +52,23 @@ async def login(
     return user
 
 
-@router.get("/auth/me", response_model=UserOut)
+@router.get(
+    "/auth/me",
+    response_model=UserOut,
+    summary="Текущий пользователь",
+    description="Возвращает username по session-cookie; `401` — сессии нет или она истекла.",
+    responses=_UNAUTHORIZED,
+)
 async def me(user: User = Depends(get_current_user)) -> User:
     return user
 
 
-@router.post("/auth/logout")
+@router.post(
+    "/auth/logout",
+    summary="Выход",
+    description="Удаляет серверную сессию и очищает cookie; ответ — `{}` (клиент парсит JSON).",
+    responses=_UNAUTHORIZED,
+)
 async def logout(
     request: Request,
     response: Response,
