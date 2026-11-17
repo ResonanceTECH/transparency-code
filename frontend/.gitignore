@@ -14,3 +14,9 @@ screenshots/
 # OS / editor
 .DS_Store
 *.log
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Generated Swagger UI assets (tools/copy-docs.mjs)
+public/docs/swagger-ui*
