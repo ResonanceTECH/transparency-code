@@ -41,6 +41,18 @@ class RunOut(BaseModel):
     signals: list[SignalOut]
 
 
+class RuleOut(BaseModel):
+    """Правило реестра для страницы «Правила проверки»."""
+
+    id: str
+    title: str
+    description: str
+
+
+class RulesOut(BaseModel):
+    rules: list[RuleOut]
+
+
 class AnalysisRunIn(BaseModel):
     """Тело `POST /cases/{id}/analysis-runs`."""
 

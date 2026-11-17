@@ -76,7 +76,7 @@ def _summarize(case: Case, run: AnalysisRun | None, signals: list[Signal], stale
     )
 
 
-def _serialize_signal(signal: Signal) -> SignalOut:
+def serialize_signal(signal: Signal) -> SignalOut:
     evidence: list[FactOut] = []
     for link in signal.evidence_links:
         if link.fact_snapshot:
@@ -105,7 +105,7 @@ def _serialize_signal(signal: Signal) -> SignalOut:
     )
 
 
-def _serialize_run(run: AnalysisRun) -> RunOut:
+def serialize_run(run: AnalysisRun) -> RunOut:
     return RunOut(
         id=run.id,
         created_at=_utc(run.created_at),
@@ -113,7 +113,7 @@ def _serialize_run(run: AnalysisRun) -> RunOut:
         enabled_rules=list(run.enabled_rules or []),
         input_hash=run.input_hash,
         warnings=list(run.warnings or []),
-        signals=[_serialize_signal(s) for s in run.signals],
+        signals=[serialize_signal(s) for s in run.signals],
     )
 
 
@@ -232,7 +232,7 @@ async def get_case_detail(db: AsyncSession, user: User, case_id: uuid.UUID) -> C
         **_summarize(case, run, signals, stale).model_dump(),
         facts=[serialize_fact(f) for f in facts],
         documents=[serialize_document(d) for d in documents],
-        runs=[_serialize_run(r) for r in case.runs],
+        runs=[serialize_run(r) for r in case.runs],
         events=[
             EventOut(
                 id=e.id,
