@@ -1,5 +1,7 @@
 """Контракт analysis/reporting-доменов и demo-наполнения (SPEC.md §5.6–5.7, §7.3–7.6)."""
 
+import io
+import json
 import uuid
 
 ALL_RULES = {"enabled_rules": ["sale-income-gap", "obligation-balance", "expense-coverage"]}
@@ -124,6 +126,37 @@ async def test_unconfirmed_facts_warn(auth_client):
     await _demo(auth_client, case_id)  # без confirm-facts
     run = await _analyze(auth_client, case_id)
     assert run["warnings"] and "неподтвержд" in run["warnings"][0]
+
+
+async def test_partial_upload_no_counterpart_facts(auth_client):
+    """Факт без парных (sale без income, расход без источников): правила не падают.
+
+    Регрессия e2e: `rub()` падал на int-сумме пустого `sum()` → 500 в анализе.
+    """
+    case_id = await _create_case(auth_client)
+    payload = {
+        "synthetic": True,
+        "facts": [
+            {"field": "sale_amount", "value": "123456", "object_id": "uploaded-car"},
+            {"field": "expense_amount", "value": "50000", "object_id": "uploaded-flat"},
+        ],
+    }
+    resp = await auth_client.post(
+        f"/api/cases/{case_id}/documents",
+        files={
+            "file": (
+                "partial.json",
+                io.BytesIO(json.dumps(payload).encode()),
+                "application/json",
+            )
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    await auth_client.post(f"/api/cases/{case_id}/confirm-facts")
+    run = await _analyze(auth_client, case_id)
+    assert {s["rule"] for s in run["signals"]} == {"sale-income-gap", "expense-coverage"}
+    sale = next(s for s in run["signals"] if s["rule"] == "sale-income-gap")
+    assert "123 456" in sale["explanation"] and "0" in sale["explanation"]
 
 
 # --- decisions -----------------------------------------------------------

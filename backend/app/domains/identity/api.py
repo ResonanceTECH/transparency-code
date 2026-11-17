@@ -13,8 +13,8 @@ from app.core.schemas import ErrorOut
 from app.domains.identity import services
 from app.domains.identity.deps import get_current_user
 from app.domains.identity.models import User
-from app.domains.identity.schemas import LoginIn, UserOut
-from app.domains.identity.services import SESSION_COOKIE
+from app.domains.identity.schemas import LoginIn, SessionOut, UserOut
+from app.domains.identity.services import SESSION_COOKIE, get_user_by_token
 
 router = APIRouter(tags=["identity"])
 
@@ -61,6 +61,22 @@ async def login(
 )
 async def me(user: User = Depends(get_current_user)) -> User:
     return user
+
+
+@router.get(
+    "/auth/session",
+    response_model=SessionOut,
+    summary="Проверка сессии без 401",
+    description=(
+        "Всегда `200`: `authenticated` + карточка пользователя либо `null`. "
+        "Boot-запрос клиента — альтернатива `GET /auth/me` без 401."
+    ),
+)
+async def session_state(request: Request, db: AsyncSession = Depends(get_db)) -> SessionOut:
+    user = await get_user_by_token(db, request.cookies.get(SESSION_COOKIE))
+    if user is None:
+        return SessionOut(authenticated=False)
+    return SessionOut(authenticated=True, user=UserOut.model_validate(user))
 
 
 @router.post(
