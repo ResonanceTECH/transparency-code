@@ -51,4 +51,30 @@ npm run dev             # интеграционный UI на :5173 (нужен
 | `e2e.yml` | push в `main` и PR | собирает весь стек docker compose и гоняет `frontend/tests/flow.spec.ts` против `127.0.0.1:8080` |
 | `cd.yml` | push в `main` | собирает и пушит образы `backend`/`frontend` в GHCR (`latest` + `sha-*` + `main`) |
 
-Образы: `ghcr.io/<org>/transparency-code-backend` и `ghcr.io/<org>/transparency-code-frontend` — на любом сервере развёртывание сводится к `docker compose pull` + `up` (или `docker run` с env из `.env.example`).
+Образы: `ghcr.io/resonancetech/transparency-code-backend` и `ghcr.io/resonancetech/transparency-code-frontend` — на любом сервере развёртывание сводится к `docker compose pull` + `up` (или `docker run` с env из `.env.example`).
+
+## Автодеплой на сервер (Watchtower)
+
+`docker-compose.prod.yml` поднимает тот же стек на готовых образах из GHCR и сервис [Watchtower](https://containrrr.dev/watchtower/): раз в 60 секунд он опрашивает реестр и, если образ `:latest` обновился, сам пересоздаёт контейнеры `backend`/`frontend`. То есть после настройки deploy = `git push` в `main` → `cd.yml` собирает и пушит образы → сервер подтягивает их в течение минуты.
+
+На сервере (разово):
+
+```bash
+# 1. Если пакеты GHCR приватные — залогиниться в реестр:
+#    docker login ghcr.io -u <github-логин> -p <PAT со scope read:packages>
+#    (либо просто указать GHCR_USER/GHCR_TOKEN в .env — их подхватит Watchtower)
+
+# 2. Код на сервере не нужен — только compose-файл и .env
+cp .env.example .env   # заполнить POSTGRES_PASSWORD, SECRET_KEY (+ GHCR_* при необходимости)
+
+# 3. Запуск
+docker compose -f docker-compose.prod.yml up -d
+```
+
+Проверка: `docker compose -f docker-compose.prod.yml ps` — четыре сервиса (`db`, `backend`, `frontend`, `watchtower`); логи автообновлений: `docker logs -f <проект>-watchtower-1`.
+
+Нюансы:
+
+- `db` (postgres) под Watchtower не подписан — базу обновляем вручную (`docker compose -f docker-compose.prod.yml pull db && up -d db`).
+- В момент обновления backend'а возможны кратковременные 502 на фронте (nginx перечитывает DNS при рестарте; Watchtower пересоздаёт frontend следом).
+- Если на сервере нет доступа к GHCR, prod-файл умеет собирать локально: в нём сохранены `build:` — `docker compose -f docker-compose.prod.yml up -d --build`.
