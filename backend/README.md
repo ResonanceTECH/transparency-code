@@ -122,3 +122,21 @@ cp .env.example .env
 - Проверено: `ruff` чист, `pytest` **18/18**, OpenAPI — теги/summary/enum'ы/коды ответов; uvicorn + живой PostgreSQL: login → create `PR-2025-0001` → list → detail → `no-store` — E2E OK.
 
 **Далее:** documents (upload/pipeline/facts) → `POST /cases/{id}/demo` → analysis (rules + runs) → signals/decisions → report → outbox-события.
+
+### Итерация 7 — SPEC v1.2 + documents-домен (17.11.2026)
+
+**SPEC.md → v1.2**: контракты извлечения зафиксированы — JSON `{synthetic:true, facts:[…]}`, XLSX с RU-заголовками, PDF/DOCX маркерные строки `field=x; value=y; …`; неподдержанный шаблон → `status=failed` + `error='Шаблон документа не распознан'`; `FIELD_LABELS` — серверный словарь подписей; дедупликация по sha256 внутри дела; заголовок OpenAPI → `Резонанс · синтетический прототип` (e2e `flow.spec.ts` проверяет title).
+
+- `documents/pipeline.py` — парсеры 4 форматов без сети: `_parse_json` (обязателен `synthetic:true` + массив `facts`), `_parse_xlsx` (openpyxl, канонические+русские заголовки), `_parse_pdf` (pypdf, текст → маркерные строки), `_parse_docx` (python-docx, абзацы → маркеры); `_norm_fact` — единая нормализация (field/value обязательны, date ISO, лимиты длин); `fact_label` — словарь `FIELD_LABELS` → field.
+- `documents/schemas.py`: `DocumentOut`/`FactOut`/`FactPatchIn` (value/date/unit/confirmed, все опциональны, min_length/max_length).
+- `documents/services.py`: `upload_document` → `(doc, created)` — валидация расширения (415), пустоты (422), размера (413), sha256-дедуп (200 вместо 201); `_extract` — processing → ready/failed + факты (`confirmed=false`, `document_name`); `patch_fact` — owner-check через join case, событие «Поле уточнено»; `confirm_case_facts` — массовое подтверждение + событие; `get_document_file` — скачивание только `downloadable` с файлом на диске.
+- Хранение: `UPLOAD_DIR/cases/{case_id}/{doc_id}_{safe_filename}`; `_safe_filename` — basename + очистка опасных символов.
+- `cases/events.py` — `record_event` вынесен из services (разрыв цикла documents↔cases services; `cases.services` реэкспортирует).
+- `cases/services.py`: `get_owned_case` — seam owner-check для других доменов.
+- `documents/api.py` — 4 эндпоинта с тегом `documents`, русскими summary/description, документированными 404/413/415/422: `POST /cases/{id}/documents` (multipart `file`, 201/200-дедуп), `GET /cases/{id}/documents/{doc}` (FileResponse), `PATCH /facts/{id}`, `POST /cases/{id}/confirm-facts` → `{"confirmed": N}`.
+- `main.py`: title → `Резонанс · синтетический прототип`.
+- `pyproject.toml`: `openpyxl`, `pypdf`, `python-docx`, `python-multipart`.
+- `tests/test_documents.py` — 9 тестов: JSON-извлечение + FIELD_LABELS, sha256-дедуп, 415/422/failed-пайплайн, non-synthetic → failed, 404 чужого дела, PATCH+confirm-facts+события, валидация PATCH/404, скачивание, XLSX RU-заголовки, валидный PDF (генерируется с xref в тесте) и DOCX маркеры.
+- Проверено: `ruff` чист, `pytest` **27/27**, OpenAPI — 10 путей, все новые эндпоинты с тегом `documents`; uvicorn + живой PostgreSQL E2E: login → case `PR-2025-0012` → upload `up.json` → `ready`+2 факта → PATCH → `confirm-facts` → download 200 → лента событий полная.
+
+**Далее:** `POST /cases/{id}/demo` (trade_in/apartment/clean) → analysis (rules + runs + signals) → decisions → report.
