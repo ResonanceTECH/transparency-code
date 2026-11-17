@@ -5,5 +5,10 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 
+# Секреты и локальное окружение (шаблон — .env.example, он коммитится)
+.env
+.env.*
+!.env.example
+
 # Загруженные пользователями файлы (локальный том)
 uploads/

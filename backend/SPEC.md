@@ -35,14 +35,15 @@ transparency-code/
   frontend/   # React-клиент (готов, перенесён)
   backend/    # этот сервис
     app/
-      main.py            # FastAPI app: роутеры /api/*, /openapi.json, middleware
-      core/              # config (pydantic-settings), security, errors
-      api/               # routers: auth, cases, documents, facts, analysis, signals, rules, reports, health
-      schemas/           # Pydantic DTO запроса/ответа
-      models/            # SQLAlchemy-модели
-      repositories/      # доступ к данным (тонкий слой)
-      services/          # use-cases: cases, documents pipeline, analysis runner, demo data, report, events
-      rules/             # детерминированный реестр правил анализа
+      main.py            # FastAPI app: composition root, роутеры /api/*, /openapi.json
+      core/              # shared kernel: config, db, deps (auth), base (ORM)
+      platform/          # health и метаданные сервиса
+      domains/           # bounded contexts — см. MICROSERVICES.md
+        identity/        #   users, sessions, auth → api/schemas/services/models
+        cases/           #   дела, статусы, события
+        documents/       #   загрузка, pipeline, факты
+        analysis/        #   rules, analysis_runs, signals, decisions
+        reporting/       #   сборка отчёта (без собственных таблиц)
     alembic/             # миграции
     tests/               # unit + contract tests
     Dockerfile
@@ -51,11 +52,14 @@ transparency-code/
   ml/                    # резерв под ML-часть (пока пусто)
 ```
 
+> Структура `app/domains/` реализована (итерация 4); карта сервисов, контракты
+> и порядок выделения в самостоятельные сервисы — в [MICROSERVICES.md](MICROSERVICES.md).
+
 Сетевое окружение: `frontend` (nginx) → `backend:8000` → `db:5432`. В dev-режиме Vite проксирует `/api` и `/openapi.json` на `http://127.0.0.1:8000`.
 
 ## 3. Транспорт и соглашения
 
-- **Префикс.** Все прикладные эндпоинты живут под `/api` (nginx `location /api/` проксирует URI без изменений; Vite-прокси тоже сохраняет путь). Реализация: `APIRouter(prefix='/api')` либо `FastAPI(root_path=...)` + роуты с префиксом — выбрать один способ и не смешивать.
+- **Префикс.** Все прикладные эндпоинты живут под `/api` (nginx `location /api/` проксирует URI без изменений; Vite-прокси тоже сохраняет путь). Префикс `/api` ≡ версия v1; версионирование `/api/v2` — при ломающих изменениях (см. MICROSERVICES.md §4).
 - **Формат.** JSON in / JSON out. `Content-Type: application/json` для всех тел, кроме multipart-загрузки файлов (`FormData`, поле `file`).
 - **Критично:** клиентский `api()` всегда вызывает `response.json()`. **Любой ответ должен быть валидным JSON** — включая `POST /auth/logout`, `POST /cases/:id/demo`, `POST /cases/:id/confirm-facts`, `POST /cases/:id/analysis-runs`. Пустое тело или `204` сломают клиент. Для «пустых» операций возвращать `200` + `{}` или `{"ok": true}`.
 - **Ошибки.** Единый формат `{"detail": "<человекочитаемое сообщение на русском>"}` (совместимо с FastAPI `HTTPException`). Клиент маппит: `401` → сброс сессии; `422` → «Проверьте обязательные поля, формат дат и значений.»; прочие → «Запрос не выполнен. Проверьте подключение к серверу.» Доменные ошибки должны возвращать `detail` строкой; ошибки валидации Pydantic могут оставаться стандартными (массив `detail`).
@@ -315,7 +319,7 @@ cases ──< case_events
 
 ### 7.5 Движок анализа
 
-- **Реестр правил** — кодовый пакет `app/rules/`: каждый модуль экспортирует `Rule{id, title, description, version?, evaluate(ctx) -> CandidateSignal[]}`. `ctx` — иммутабельный снапшот: реквизиты дела + факты (проиндексированные по `field`/`object_id`, с `confirmed`, `value`, `date`, `unit`). Детерминизм: без I/O, без случайности, без времени.
+- **Реестр правил** — пакет `app/domains/analysis/rules/`: каждый модуль экспортирует `Rule{id, title, description, version?, evaluate(ctx) -> CandidateSignal[]}`. `ctx` — иммутабельный снапшот: реквизиты дела + факты (проиндексированные по `field`/`object_id`, с `confirmed`, `value`, `date`, `unit`). Детерминизм: без I/O, без случайности, без времени.
 - **`rule_version`** — semver реестра (например, `0.1.0`), пишется в каждый запуск; сохранённые запуски не пересчитываются.
 - **Снапшот и `input_hash`**: каноническая сериализация входа (case meta + все факты, отсортированные по `id`, включая `confirmed`) → SHA-256 hex. Одинаковый вход → одинаковый hash (важно для e2e: повторный анализ без изменений должен давать воспроизводимый результат).
 - **Сигнал**: `{rule_id, title, explanation, action, evidence_fact_ids[], sort}` → строки `signals` + `signal_facts`. `evidence` в API — полные `Fact` (с `document_name`, `snippet`).
