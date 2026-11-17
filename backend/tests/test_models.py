@@ -5,18 +5,18 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import selectinload
 
-from app.models import (
+from app.core.base import Base
+from app.domains.analysis.models import (
     AnalysisRun,
-    Base,
-    Case,
     Decision,
-    Document,
-    Fact,
+    DecisionStatus,
     Signal,
     SignalFact,
-    User,
+    SignalStatus,
 )
-from app.models.enums import Basis, DecisionStatus, DocumentStatus, SignalStatus
+from app.domains.cases.models import Basis, Case
+from app.domains.documents.models import Document, DocumentStatus, Fact
+from app.domains.identity.models import User
 
 
 @pytest.fixture
