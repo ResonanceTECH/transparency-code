@@ -197,14 +197,23 @@ def draft_snapshot(profile: Profile) -> dict:
             {"category": b.category.value,
              "answer": b.answer.value if b.answer else None,
              "records": [
-                 {**{k: v for k, v in r.__dict__.items() if not k.startswith("_")},
-                  "recipient_kind": r.recipient_kind.value if r.recipient_kind else None,
-                  "amount": str(r.amount) if r.amount is not None else None,
-                  "period_from": r.period_from.isoformat() if r.period_from else None,
-                  "period_to": r.period_to.isoformat() if r.period_to else None,
-                  "payment_date": r.payment_date.isoformat() if r.payment_date else None,
-                  "event_date": r.event_date.isoformat() if r.event_date else None,
-                  "document_id": str(r.document_id) if r.document_id else None}
+                 {
+                     "recipient_kind": r.recipient_kind.value if r.recipient_kind else None,
+                     "recipient_name": r.recipient_name,
+                     "recipient_birth_year": r.recipient_birth_year,
+                     "relation": r.relation,
+                     "title": r.title, "kind_text": r.kind_text,
+                     "basis": r.basis, "level": r.level, "form": r.form,
+                     "amount": str(r.amount) if r.amount is not None else None,
+                     "period_from": r.period_from.isoformat() if r.period_from else None,
+                     "period_to": r.period_to.isoformat() if r.period_to else None,
+                     "payment_date": r.payment_date.isoformat() if r.payment_date else None,
+                     "event_date": r.event_date.isoformat() if r.event_date else None,
+                     "housing_kind": r.housing_kind,
+                     "document_ref": r.document_ref,
+                     "document_id": str(r.document_id) if r.document_id else None,
+                     "extra": r.extra or {},
+                 }
                  for r in b.records
              ]}
             for b in profile.payment_blocks
