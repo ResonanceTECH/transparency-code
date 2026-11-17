@@ -20,15 +20,17 @@ backend/
   pyproject.toml        # зависимости и настройки инструментов
   .env.example          # шаблон переменных окружения
   app/
-    main.py             # create_app: роутеры /api/*, /openapi.json, обработчики ошибок
-    core/               # config (pydantic-settings), db (async engine + get_db)
-    api/                # routers: health, … (auth, cases, … — по мере итераций)
-    schemas/            # Pydantic DTO
-    models/             # SQLAlchemy-модели (Base)
-    repositories/       # доступ к данным
-    services/           # use-cases: cases, documents pipeline, analysis, demo data, report, events
-    rules/              # детерминированный реестр правил анализа
-  alembic/              # миграции (появится с моделями)
+    main.py             # create_app: composition root, /openapi.json, обработчики ошибок
+    core/               # shared kernel: config, db, deps, base
+    platform/           # health и метаданные сервиса
+    domains/            # bounded contexts — см. MICROSERVICES.md
+      identity/         #   users, sessions, auth: api/schemas/services/models
+      cases/            #   дела, статусы, события
+      documents/        #   загрузка, pipeline, факты
+      analysis/         #   rules, analysis_runs, signals, decisions
+      reporting/        #   сборка отчёта (без собственных таблиц)
+  MICROSERVICES.md      # карта сервисов, контракты, путь выделения
+  alembic/              # миграции (env.py готов; revisions — после поднятия PostgreSQL)
   tests/                # pytest + httpx AsyncClient
   Dockerfile            # python:3.12-slim → сервис backend:8000 (позже)
 ```
@@ -70,4 +72,14 @@ cp .env.example .env
 - `tests/test_health.py` — 2 теста (health + наличие пути в OpenAPI); `.env.example`, `backend/.gitignore`.
 - Проверено: `pytest` 2/2, `uvicorn` + `curl /api/health` и `/openapi.json` — OK.
 
-**Далее:** ORM-модели и Alembic-миграции (SPEC §6) → auth (sessions, demo-логин) → cases CRUD → documents → analysis/rules → signals/decisions → report.
+### Итерация 3 — ORM-модели и миграции (16.11.2026)
+
+- `app/models/`: все 10 таблиц SPEC §6 — `users`, `sessions`, `cases`, `documents`, `facts`, `analysis_runs`, `signals`, `signal_facts`, `decisions`, `case_events`.
+- `enums.py`: `Basis`, `DocumentStatus`, `SignalStatus`, `DecisionStatus`, `UserRole` — `sa.Enum(native_enum=False, validate_strings=True)` (VARCHAR+CHECK, переносимо между PG и SQLite).
+- `base.py`: `DeclarativeBase` с naming convention для constraints; `JSONType = JSON().with_variant(JSONB(), "postgresql")` — JSONB в PG, JSON в SQLite-тестах.
+- Связи: `Case → documents/facts/runs/events`, `AnalysisRun → signals`, `Signal → evidence_links/decisions`, `SignalFact → signal/fact` (composite PK + ordinal), каскады `delete-orphan`/`SET NULL` для `document_id`.
+- `alembic/`: `alembic.ini` + async `env.py` (URL из `Settings`, `target_metadata = Base.metadata`) + `script.py.mako`; первая миграция — `alembic revision --autogenerate` при поднятой PostgreSQL.
+- `tests/test_models.py`: smoke-граф на `sqlite+aiosqlite` (create_all → user→case→doc→fact→run→signal→decision → selectinload-выборка). Dev-зависимость `aiosqlite`.
+- Проверено: `pytest` 3/3, `ruff check` чист, `Base.metadata.tables` — все 10 таблиц.
+
+**Далее:** auth (sessions, demo-логин, `get_current_user`) → cases CRUD → documents → analysis/rules → signals/decisions → report.

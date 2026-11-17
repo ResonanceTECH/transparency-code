@@ -11,10 +11,12 @@ class Settings(BaseSettings):
     app_name: str = "Резонанс API"
     environment: str = "development"
 
-    database_url: str = "postgresql+asyncpg://resonance:resonance@localhost:5432/resonance"
-    secret_key: str = "dev-secret-change-me"
+    # Реальные креды — только в .env; в коде паролей нет.
+    database_url: str = "postgresql+asyncpg://resonance@localhost:5432/resonance"
+    secret_key: str = ""
 
     demo_username: str = "demo"
+    # Демо-логин учебного контура (синтетические данные); отключается ALLOW_DEMO_LOGIN=false.
     demo_password: str = "resonance-demo-2026"
     allow_demo_login: bool = True
 
