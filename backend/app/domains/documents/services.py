@@ -89,7 +89,7 @@ async def upload_document(
         )
     content = await upload.read()
     if not content:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Пустой файл")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Пустой файл")
     if len(content) > settings.max_upload_mb * 1024 * 1024:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,

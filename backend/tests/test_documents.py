@@ -177,18 +177,58 @@ async def test_xlsx_and_marker_extraction(auth_client):
     resp = await _upload(auth_client, case_id, "data.xlsx", buf.getvalue(), "application/vnd.ms-excel")
     assert resp.status_code == 201 and resp.json()["status"] == "ready", resp.text
 
-    # PDF с маркерной строкой
-    pdf_bytes = b"""%PDF-1.4
-1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj
-2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj
-3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj
-4 0 obj<</Length 120>>stream
-BT /F1 12 Tf 50 700 Td (field=sale_amount; value=555; object_id=x; date=2025-01-01; unit=RUB) Tj ET
-endstream
-endobj
-5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj
-trailer<</Root 1 0 R>>
-%%EOF"""
+    # PDF с маркерной строкой — минимальный валидный PDF (xref считается)
+    pdf_bytes = _make_pdf(
+        "field=sale_amount; value=555; object_id=x; date=2025-01-01; unit=RUB"
+    )
     resp = await _upload(auth_client, case_id, "doc.pdf", pdf_bytes, "application/pdf")
     assert resp.status_code == 201, resp.text
     assert resp.json()["status"] == "ready", resp.json()
+
+    # DOCX с той же маркерной строкой
+    import docx
+
+    document = docx.Document()
+    document.add_paragraph(
+        "field=obligation_balance; value=300000; object_id=loan-1; unit=RUB"
+    )
+    buf = io.BytesIO()
+    document.save(buf)
+    resp = await _upload(auth_client, case_id, "doc.docx", buf.getvalue(),
+                         "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["status"] == "ready", resp.json()
+
+    detail = (await auth_client.get(f"/api/cases/{case_id}")).json()
+    fields = {f["field"]: f["value"] for f in detail["facts"]}
+    assert fields["sale_amount"] == "555"
+    assert fields["obligation_balance"] == "300000"
+
+
+def _make_pdf(text: str) -> bytes:
+    """Минимальный одностраничный PDF с текстом (для pypdf extract_text)."""
+    stream = f"BT /F1 12 Tf 50 700 Td ({text}) Tj ET".encode()
+    objects = [
+        b"<</Type/Catalog/Pages 2 0 R>>",
+        b"<</Type/Pages/Kids[3 0 R]/Count 1>>",
+        b"<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]"
+        b"/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>",
+        b"<</Length " + str(len(stream)).encode() + b">>\nstream\n" + stream + b"\nendstream",
+        b"<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>",
+    ]
+    out = io.BytesIO()
+    out.write(b"%PDF-1.4\n")
+    offsets = []
+    for i, body in enumerate(objects, start=1):
+        offsets.append(out.tell())
+        out.write(f"{i} 0 obj\n".encode() + body + b"\nendobj\n")
+    xref_pos = out.tell()
+    out.write(f"xref\n0 {len(objects) + 1}\n".encode())
+    out.write(b"0000000000 65535 f \n")
+    for off in offsets:
+        out.write(f"{off:010d} 00000 n \n".encode())
+    out.write(
+        f"trailer\n<</Size {len(objects) + 1}/Root 1 0 R>>\n"
+        f"startxref\n{xref_pos}\n%%EOF".encode()
+    )
+    return out.getvalue()
