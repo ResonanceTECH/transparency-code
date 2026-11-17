@@ -7,6 +7,7 @@
 
 import uuid
 from datetime import UTC, datetime
+from decimal import Decimal, InvalidOperation
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -228,6 +229,41 @@ def draft_snapshot(profile: Profile) -> dict:
         ],
         "documents": [{"id": str(d.id), "filename": d.filename, "kind": d.kind}
                       for d in profile.documents],
+    }
+
+
+def income_summary(snapshot: dict) -> dict:
+    """Агрегат «Сведения о доходах» для проверяющего (SPEC §10.8).
+
+    Суммируются только денежные поступления: записи с `form == "monetary"`;
+    категория `non_monetary` и форма `in_kind` в сумму не входят.
+    Вход — слепок `ProfileVersion.snapshot` (иммутабелен, совпадает с показанным).
+    """
+    by_category: dict[str, Decimal] = {}
+    total = Decimal("0")
+    count = 0
+    for block in snapshot.get("payments") or []:
+        category = block.get("category") or ""
+        if category == PaymentCategory.NON_MONETARY.value:
+            continue
+        for rec in block.get("records") or []:
+            if rec.get("form") != "monetary":
+                continue
+            try:
+                amount = Decimal(str(rec.get("amount") or "0"))
+            except InvalidOperation:
+                continue
+            by_category[category] = by_category.get(category, Decimal("0")) + amount
+            total += amount
+            count += 1
+    return {
+        "currency": "RUB",
+        "total": str(total.quantize(Decimal("0.01"))),
+        "records": count,
+        "by_category": [
+            {"category": cat, "total": str(amount.quantize(Decimal("0.01")))}
+            for cat, amount in sorted(by_category.items())
+        ],
     }
 
 

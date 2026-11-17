@@ -39,6 +39,7 @@ from app.domains.profile.schemas import (
     DocumentOut,
     DraftIn,
     DraftOut,
+    IncomeSummaryOut,
     MessageIn,
     MessageOut,
     PaymentBlockOut,
@@ -453,6 +454,7 @@ async def reviewer_profile(profile_id: uuid.UUID,
         messages=messages,
         reviews=reviews,
         assigned_reviewer=reviewer,
+        income_summary=IncomeSummaryOut(**svc.income_summary(version.snapshot)),
     )
 
 
