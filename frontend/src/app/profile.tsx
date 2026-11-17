@@ -54,8 +54,16 @@ type Signal = { id: string; rule_id: string; title: string; explanation: string;
 type Message = { id: string; author_role: string; author_name: string; kind: string; text: string; created_at: string }
 type Contact = { id: string; name: string; responsibility: string; phone: string; email: string }
 type QueueItem = { profile_id: string; full_name: string; program: string; status: string; progress: number; submitted_at: string | null; pending_signals: number; reviewer_name: string }
+type IncomeSummary = {
+  currency: string
+  total: string
+  records: number
+  by_category: { category: string; total: string }[]
+}
+type AuditEvent = { id: string; actor_name: string; actor_role: string; action: string; created_at: string }
 type ReviewerProfile = {
   profile_id: string; full_name: string; status: string; pending_signals: number; assigned_reviewer: string
+  income_summary: IncomeSummary
   version: Version & { snapshot: Record<string, any> }
   signals: Signal[]; messages: Message[]
   reviews: { id: string; result: string; basis_text: string; comment: string; author_name: string; created_at: string }[]
@@ -135,21 +143,23 @@ function ReservistView({ toast }: { toast: (m: string) => void }) {
   const [signals, setSignals] = useState<Signal[]>([])
   const [messages, setMessages] = useState<Message[]>([])
   const [contacts, setContacts] = useState<Contact[]>([])
+  const [audit, setAudit] = useState<AuditEvent[]>([])
   const [error, setError] = useState('')
   const [reply, setReply] = useState('')
   const [docKind, setDocKind] = useState('diploma')
 
   const editable = !!draft && EDITABLE.includes(draft.status)
   const load = async () => {
-    const [d, c, v, s, ms, ct] = await Promise.all([
+    const [d, c, v, s, ms, ct, au] = await Promise.all([
       api<Draft>('/profile'),
       api<Completeness>('/profile/completeness'),
       api<Version[]>('/profile/versions'),
       api<Signal[]>('/profile/signals'),
       api<Message[]>('/profile/messages'),
-      api<Contact[]>('/reference/contacts')
+      api<Contact[]>('/reference/contacts'),
+      api<AuditEvent[]>('/profile/audit')
     ])
-    setDraft(d); setComp(c); setVersions(v); setSignals(s); setMessages(ms); setContacts(ct)
+    setDraft(d); setComp(c); setVersions(v); setSignals(s); setMessages(ms); setContacts(ct); setAudit(au)
   }
   useEffect(() => { load().catch((e) => setError(e.message)) }, [])
 
@@ -323,6 +333,11 @@ function ReservistView({ toast }: { toast: (m: string) => void }) {
                     <label>Период с<input disabled={!editable} type="date" value={r.period_from || ''} onChange={(e) => setBlock(b.category, (x) => { x.records[i].period_from = e.target.value || null })} /></label>
                     <label>по<input disabled={!editable} type="date" value={r.period_to || ''} onChange={(e) => setBlock(b.category, (x) => { x.records[i].period_to = e.target.value || null })} /></label>
                     <label>Сумма<input disabled={!editable} value={r.amount || ''} onChange={(e) => setBlock(b.category, (x) => { x.records[i].amount = e.target.value || null })} /></label>
+                    <label>Форма
+                      <select disabled={!editable} value={r.form} onChange={(e) => setBlock(b.category, (x) => { x.records[i].form = e.target.value })}>
+                        <option value="">—</option><option value="monetary">Денежная</option><option value="in_kind">Неденежная</option>
+                      </select>
+                    </label>
                   </div>
                   <div className="form-row">
                     <label>Документ-основание<input disabled={!editable} value={r.document_ref} onChange={(e) => setBlock(b.category, (x) => { x.records[i].document_ref = e.target.value })} placeholder="Реквизиты документа" /></label>
@@ -455,6 +470,17 @@ function ReservistView({ toast }: { toast: (m: string) => void }) {
           ))}
         </Panel>
       )}
+
+      {!!audit.length && (
+        <Panel title="Журнал действий">
+          {audit.map((a) => (
+            <div key={a.id} className="document">
+              <span style={{ flex: 1 }}><b>{a.action}</b> <small className="muted">· {a.actor_name}</small></span>
+              <span className="muted">{dateText(a.created_at)}</span>
+            </div>
+          ))}
+        </Panel>
+      )}
     </>
   )
 }
@@ -465,6 +491,7 @@ function ReviewerView({ toast }: { toast: (m: string) => void }) {
   const [queue, setQueue] = useState<QueueItem[]>([])
   const [filter, setFilter] = useState('')
   const [card, setCard] = useState<ReviewerProfile | null>(null)
+  const [audit, setAudit] = useState<AuditEvent[]>([])
   const [error, setError] = useState('')
   const [comment, setComment] = useState('')
   const [basis, setBasis] = useState('')
@@ -472,7 +499,10 @@ function ReviewerView({ toast }: { toast: (m: string) => void }) {
   const [signalComments, setSignalComments] = useState<Record<string, string>>({})
 
   const loadQueue = async () => setQueue(await api<QueueItem[]>(`/reviewer/queue${filter ? `?status=${filter}` : ''}`))
-  const loadCard = async (id: string) => setCard(await api<ReviewerProfile>(`/reviewer/profiles/${id}`))
+  const loadCard = async (id: string) => {
+    setCard(await api<ReviewerProfile>(`/reviewer/profiles/${id}`))
+    setAudit(await api<AuditEvent[]>(`/reviewer/profiles/${id}/audit`))
+  }
   useEffect(() => { loadQueue().catch((e) => setError(e.message)) }, [filter])
   const run = (fn: () => Promise<void>, ok = '') =>
     fn().then(async () => {
@@ -529,6 +559,27 @@ function ReviewerView({ toast }: { toast: (m: string) => void }) {
               ))}
             </div>
           ))}
+        </Panel>
+
+        <Panel title="Сведения о доходах">
+          <div className="info-grid">
+            <div><small>Денежные поступления</small><b>{card.income_summary?.total ?? '0.00'} {card.income_summary?.currency || 'RUB'}</b></div>
+            <div><small>Записей в сумме</small><b>{card.income_summary?.records ?? 0}</b></div>
+          </div>
+          {!!card.income_summary?.by_category.length && (
+            <table>
+              <thead><tr><th>Категория</th><th>Сумма</th></tr></thead>
+              <tbody>
+                {card.income_summary.by_category.map((c) => (
+                  <tr key={c.category}>
+                    <td>{CATEGORIES.find(([k]) => k === c.category)?.[1] || c.category}</td>
+                    <td>{c.total} {card.income_summary.currency}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <p className="muted">Учитываются только денежные выплаты; неденежные меры и выплаты «в натуре» в сумму не входят.</p>
         </Panel>
 
         <Panel title={`Несоответствия (${card.pending_signals} новых)`}>
@@ -591,6 +642,17 @@ function ReviewerView({ toast }: { toast: (m: string) => void }) {
             </div>
           )}
         </Panel>
+
+        {!!audit.length && (
+          <Panel title="Журнал рассмотрения">
+            {audit.map((a) => (
+              <div key={a.id} className="document">
+                <span style={{ flex: 1 }}><b>{a.action}</b> <small className="muted">· {a.actor_name}</small></span>
+                <span className="muted">{dateText(a.created_at)}</span>
+              </div>
+            ))}
+          </Panel>
+        )}
       </>
     )
   }
