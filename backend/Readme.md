@@ -82,4 +82,18 @@ cp .env.example .env
 - `tests/test_models.py`: smoke-граф на `sqlite+aiosqlite` (create_all → user→case→doc→fact→run→signal→decision → selectinload-выборка). Dev-зависимость `aiosqlite`.
 - Проверено: `pytest` 3/3, `ruff check` чист, `Base.metadata.tables` — все 10 таблиц.
 
-**Далее:** auth (sessions, demo-логин, `get_current_user`) → cases CRUD → documents → analysis/rules → signals/decisions → report.
+<|open|>argument key="new_string" type="string"<|sep|>### Итерация 4 — микросервисная декомпозиция: bounded contexts (17.11.2026)
+
+- `app/` перестроен из плоской структуры в доменные модули: `core/` (shared kernel: config, db, deps, base), `platform/` (health), `domains/{identity,cases,documents,analysis,reporting}` — каждый с `api.py`/`schemas.py`/`services.py`/`models.py` по единому шаблону.
+- ORM-модели распределены по доменам-владельцам: `identity` → users/sessions; `cases` → cases/case_events; `documents` → documents/facts; `analysis` → analysis_runs/signals/signal_facts/decisions; enum'ы переехали в `models.py` своих доменов. Старые `app/models`, `app/api`, `app/schemas`, `app/services`, `app/rules`, `app/repositories` удалены.
+- `core/deps.py` — точка внедрения зависимостей (`get_db`; позже `get_current_user` от identity-сервиса). `main.py` — composition root: монтирует platform + доменные роутеры под `/api`.
+- `MICROSERVICES.md`: карта из 6 сервисов с data ownership, shared kernel, синхронные/асинхронные контракты (outbox → брокер), порядок выделения Phase 0–4, чек-лист для новых эндпоинтов.
+- `SPEC.md`: дерево структуры обновлено под `domains/`; `app/rules/` → `app/domains/analysis/rules/`; `/api` зафиксирован как v1.
+- Проверено: `ruff` чист, `pytest` 3/3, `create_app()` — роуты `/api/health` + `/openapi.json` на месте.
+
+### Итерация 4.5 — секреты (17.11.2026)
+
+- `.env.example` очищен от кредов: `DATABASE_URL` без пароля, `SECRET_KEY` пустой с подсказкой, `DEMO_PASSWORD` убран.
+- `app/core/config.py`: убраны дефолтные `postgresql+asyncpg://resonance:resonance@…`, `secret_key="dev-secret-change-me"` — реальные значения только из env/`.env`. `demo_password` оставлен (учебный логин, виден в UI клиента).
+
+**Далее:** auth в `domains/identity` (hashing, sessions, demo-логин, `get_current_user`) → cases CRUD → documents pipeline → analysis/rules → signals/decisions → report → outbox-события.
