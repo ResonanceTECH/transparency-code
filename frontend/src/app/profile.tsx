@@ -168,6 +168,40 @@ function ReservistView({ toast }: { toast: (m: string) => void }) {
       .then(async () => { await load(); if (ok) toast(ok) })
       .catch((e) => setError(e.message))
 
+  // Точечные обновления — без load(): полная перезагрузка затирает
+  // несохранённые правки черновика.
+  const addDoc = async (f: File, kind: string) => {
+    try {
+      const body = new FormData()
+      body.append('file', f)
+      body.append('kind', kind)
+      const doc = await api<Doc>('/profile/documents', { method: 'POST', body })
+      setDraft((d) => d && { ...d, documents: [...d.documents.filter((x) => x.id !== doc.id), doc] })
+      setComp(await api<Completeness>('/profile/completeness'))
+      toast('Документ загружен')
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
+  const removeDoc = async (id: string) => {
+    try {
+      await api(`/profile/documents/${id}`, { method: 'DELETE' })
+      setDraft((d) => d && { ...d, documents: d.documents.filter((x) => x.id !== id) })
+      setComp(await api<Completeness>('/profile/completeness'))
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
+  const postReply = async (text: string) => {
+    try {
+      const msg = await api<Message>('/profile/messages', { method: 'POST', body: JSON.stringify({ text }) })
+      setMessages((m) => [...m, msg])
+      setReply('')
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
+
   const upd = (fn: (d: Draft) => void) => setDraft((d) => { if (!d) return d; const c = { ...d }; fn(c); return c })
   const setPerson = (k: keyof Person, v: string | number | null) => upd((d) => { d.person = { ...d.person, [k]: v } })
   const setProgram = (k: keyof Program, v: string | number | null) => upd((d) => { d.program = { ...d.program, [k]: v } })
@@ -395,11 +429,7 @@ function ReservistView({ toast }: { toast: (m: string) => void }) {
             <Upload size={15} /> Загрузить
             <input type="file" style={{ display: 'none' }} accept=".json,.xlsx,.pdf,.docx" onChange={(e) => {
               const f = e.target.files?.[0]
-              if (!f) return
-              const body = new FormData()
-              body.append('file', f)
-              body.append('kind', docKind)
-              run(() => api('/profile/documents', { method: 'POST', body }).then(() => {}), 'Документ загружен')
+              if (f) void addDoc(f, docKind)
               e.target.value = ''
             }} />
           </span>
@@ -410,7 +440,7 @@ function ReservistView({ toast }: { toast: (m: string) => void }) {
           <div key={d.id} className="document">
             <FileText size={16} />
             <span style={{ flex: 1 }}>{d.filename} <small className="muted">· {DOC_KINDS.find(([k]) => k === d.kind)?.[1] || d.kind}</small></span>
-            {editable && <button className="icon-button" aria-label="Удалить" onClick={() => run(() => api(`/profile/documents/${d.id}`, { method: 'DELETE' }).then(() => {}))}><Trash2 size={15} /></button>}
+            {editable && <button className="icon-button" aria-label="Удалить" onClick={() => void removeDoc(d.id)}><Trash2 size={15} /></button>}
           </div>
         ))}
       </Panel>
@@ -454,7 +484,7 @@ function ReservistView({ toast }: { toast: (m: string) => void }) {
           {draft.status !== 'completed' && draft.status !== 'removed' && (
             <div className="form-row" style={{ alignItems: 'end' }}>
               <label style={{ flex: 1 }}>Ответ<input value={reply} onChange={(e) => setReply(e.target.value)} placeholder="Ответ на вопросы проверяющего" /></label>
-              <button className="secondary" disabled={!reply.trim()} onClick={() => run(() => api('/profile/messages', { method: 'POST', body: JSON.stringify({ text: reply }) }).then(() => { setReply('') }))}><Send size={15} /> Отправить</button>
+              <button className="secondary" disabled={!reply.trim()} onClick={() => void postReply(reply)}><Send size={15} /> Отправить</button>
             </div>
           )}
         </Panel>
