@@ -15,6 +15,10 @@ on:
       - 'docker-compose.yml'
       - '.github/workflows/e2e.yml'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   compose-stack:
     runs-on: ubuntu-latest
@@ -48,6 +52,15 @@ jobs:
       - name: Show backend logs on failure
         if: failure()
         run: docker compose logs --tail=200 backend db
+
+      - name: Upload Playwright artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-e2e-results
+          path: frontend/test-results
+          retention-days: 14
+          if-no-files-found: ignore
 
       - name: Tear down stack
         if: always()

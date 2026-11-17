@@ -6,6 +6,10 @@ on:
   pull_request:
     paths: ['backend/**', '.github/workflows/backend-ci.yml']
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
