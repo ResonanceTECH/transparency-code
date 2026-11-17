@@ -14,6 +14,8 @@ from app.domains.documents import api as documents_api
 from app.domains.identity import api as identity_api
 from app.domains.identity import services as identity_services
 from app.domains.identity.deps import get_current_user
+from app.domains.profile import api as profile_api
+from app.domains.profile import services as profile_services
 from app.domains.reporting import api as reporting_api
 from app.platform import api as platform_api
 
@@ -21,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 # Доменные роутеры, требующие сессии: защита на уровне роутера — забыть
 # Depends в новом эндпоинте нельзя (SPEC.md §4). `identity` управляет auth сам.
-_PROTECTED_ROUTERS = (cases_api, documents_api, analysis_api, reporting_api)
+_PROTECTED_ROUTERS = (cases_api, documents_api, analysis_api, reporting_api, profile_api)
 
 
 @asynccontextmanager
@@ -31,6 +33,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         try:
             async with get_session_factory()() as session:
                 await identity_services.seed_demo_user(session)
+                await profile_services.seed_contacts(session)
                 await session.commit()
         except Exception:
             logger.warning("Не удалось создать demo-пользователя (БД недоступна?)", exc_info=True)

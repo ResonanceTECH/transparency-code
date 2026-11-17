@@ -280,7 +280,8 @@ class Activity(Base):
         ForeignKey("profiles.id", ondelete="CASCADE"), index=True
     )
     organization: Mapped[str] = mapped_column(String(300), default="")
-    kind: Mapped[str] = mapped_column(String(64), default="")  # teaching|expertise|consulting|commission|other
+    # teaching|expertise|consulting|commission|other
+    kind: Mapped[str] = mapped_column(String(64), default="")
     engagement: Mapped[str] = mapped_column(String(64), default="")  # periodic|one_time|contract
     period_from: Mapped[date | None] = mapped_column(Date)
     period_to: Mapped[date | None] = mapped_column(Date)
@@ -303,7 +304,8 @@ class ProfileDocument(Base):
     storage_key: Mapped[str] = mapped_column(String(500))  # путь в UPLOAD_DIR/profiles/{id}
     sha256: Mapped[str] = mapped_column(String(64))
     size: Mapped[int] = mapped_column(default=0)
-    kind: Mapped[str] = mapped_column(String(64), default="other")  # diploma|reserve_act|order|contract|act|letter|other
+    # diploma|reserve_act|order|contract|act|letter|other
+    kind: Mapped[str] = mapped_column(String(64), default="other")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     profile: Mapped[Profile] = relationship(back_populates="documents")
@@ -394,7 +396,9 @@ class ProfileMessage(Base):
         Enum(MessageKind, native_enum=False, validate_strings=True, length=32)
     )
     text: Mapped[str] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), index=True, server_default=func.now()
+    )
 
 
 class ProfileReview(Base):
@@ -438,7 +442,9 @@ class ProfileAudit(Base):
         Enum(AuditScope, native_enum=False, validate_strings=True, length=16),
         default=AuditScope.PRIVATE,
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), index=True, server_default=func.now()
+    )
 
 
 class ReviewerAssignment(Base):

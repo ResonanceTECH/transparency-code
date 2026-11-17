@@ -484,6 +484,11 @@ async def remove_document(db: AsyncSession, profile: Profile, doc_id: uuid.UUID)
 
 
 __all__ = [
-    "PAYMENT_CATEGORIES", "EDITABLE", "PaymentCategory", "ProfileStatus",
-    "SignalStatus", "WorkStatus", "ReviewResult",
+    "EDITABLE",
+    "PAYMENT_CATEGORIES",
+    "PaymentCategory",
+    "ProfileStatus",
+    "ReviewResult",
+    "SignalStatus",
+    "WorkStatus",
 ]
