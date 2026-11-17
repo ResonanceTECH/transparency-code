@@ -69,6 +69,14 @@ async def get_or_create_profile(db: AsyncSession, user: User) -> Profile:
     profile = await db.scalar(_profile_query().where(Profile.owner_id == user.id))
     if profile is None:
         profile = Profile(owner_id=user.id, full_name=user.display_name)
+        # Пустые коллекции назначаются до add/flush — на pending-объекте это
+        # не вызывает lazy-load (иначе MissingGreenlet в сериализаторах).
+        profile.service_periods = []
+        profile.relatives = []
+        profile.payment_blocks = []
+        profile.activities = []
+        profile.documents = []
+        profile.versions = []
         db.add(profile)
         await db.flush()
         add_audit(db, profile, user, "Черновик профиля создан", AuditScope.PRIVATE)
