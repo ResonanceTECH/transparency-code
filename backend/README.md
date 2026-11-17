@@ -96,4 +96,14 @@ cp .env.example .env
 - `.env.example` очищен от кредов: `DATABASE_URL` без пароля, `SECRET_KEY` пустой с подсказкой, `DEMO_PASSWORD` убран.
 - `app/core/config.py`: убраны дефолтные `postgresql+asyncpg://resonance:resonance@…`, `secret_key="dev-secret-change-me"` — реальные значения только из env/`.env`. `demo_password` оставлен (учебный логин, виден в UI клиента).
 
-**Далее:** auth в `domains/identity` (hashing, sessions, demo-логин, `get_current_user`) → cases CRUD → documents pipeline → analysis/rules → signals/decisions → report → outbox-события.
+### Итерация 5 — auth: identity-домен (17.11.2026)
+
+- `domains/identity/services.py`: argon2id (`argon2-cffi`, зависимость в `pyproject`); `authenticate` с фиктивным хэшом против user-enumeration; серверные сессии `secrets.token_urlsafe(32)`, TTL из `SESSION_TTL_HOURS`, ленивое продление при активности (не чаще 5 мин, явный commit — `get_db` не коммитит); идемпотентный `seed_demo_user` из env.
+- `domains/identity/deps.py`: `get_current_user` — публичный auth-контракт домена (точка подмены при выделении в сервис); токен сессии кладётся в `request.state.session_token`.
+- `domains/identity/api.py`: `POST /auth/login` (cookie `session`: HttpOnly, SameSite=Lax, Path=/, Secure вне development), `GET /auth/me`, `POST /auth/logout` → `{}`. Все ответы JSON.
+- `main.py`: lifespan с best-effort сидом demo-аккаунта (недоступная БД не роняет health); доменные роутеры cases/documents/analysis/reporting подключены с `dependencies=[Depends(get_current_user)]` — защита на уровне роутера.
+- `tests/conftest.py`: общие фикстуры `db_session` (SQLite memory) и `client` (AsyncClient + override `get_db`); `test_models.py` переведён на общую фикстуру. `tests/test_auth.py`: 6 тестов — public health, 401 без сессии, неверный пароль/неизвестный юзер, полный flow login→me→logout, протухшая сессия.
+- `pyproject.toml`: `argon2-cffi>=23.1,<26`; ruff `extend-immutable-calls` для `fastapi.Depends` и др. (B008).
+- Проверено: `ruff` чист, `pytest` 9/9, uvicorn + curl на живом PostgreSQL — login/me/logout E2E OK.
+
+**Далее:** cases CRUD (`GET/POST /api/cases`, `GET /api/cases/{id}`) → documents pipeline → analysis/rules → signals/decisions → report → outbox-события.

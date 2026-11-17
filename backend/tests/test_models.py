@@ -2,10 +2,8 @@
 
 import pytest
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import selectinload
 
-from app.core.base import Base
 from app.domains.analysis.models import (
     AnalysisRun,
     Decision,
@@ -20,14 +18,8 @@ from app.domains.identity.models import User
 
 
 @pytest.fixture
-async def session():
-    engine = create_async_engine("sqlite+aiosqlite://")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    factory = async_sessionmaker(engine, expire_on_commit=False)
-    async with factory() as s:
-        yield s
-    await engine.dispose()
+async def session(db_session):
+    yield db_session
 
 
 async def test_full_graph(session):
