@@ -2,7 +2,7 @@
 name = "resonance-backend"
 version = "0.1.0"
 description = "Резонанс — backend API прототипа проверки сведений (FastAPI + PostgreSQL)"
-readme = "README.md"
+readme = "Readme.md"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115,<0.120",
@@ -38,6 +38,8 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 110
 target-version = "py312"
+# Миграции генерируются alembic — длинные строки и порядок импортов не правим вручную.
+extend-exclude = ["alembic/versions"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "ASYNC", "RUF"]
