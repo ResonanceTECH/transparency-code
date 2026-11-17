@@ -43,7 +43,11 @@ function LogoMark({ size = 40 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 40 40" aria-hidden="true">
       <rect width="40" height="40" rx="10" fill="#0d4cd3" />
-      <path d="M11.5 10.5 L29.5 17 L23 20 L29.5 23 L11.5 29.5 Z" fill="#fff" />
+      <rect x="12" y="9.5" width="3.1" height="21" rx="1.55" fill="#fff" />
+      <path
+        d="M17.5 10 C21.5 8.2 24.5 12.3 30.5 10.2 L27.8 16.2 C25.2 20.2 20.3 15.8 17.5 17.4 Z"
+        fill="#fff"
+      />
     </svg>
   )
 }
