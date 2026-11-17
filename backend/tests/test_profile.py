@@ -6,44 +6,54 @@
 """
 
 import uuid
-from datetime import date
 
 import pytest
 import pytest_asyncio
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 
+from app.core.deps import get_db
 from app.domains.identity.models import User, UserRole
 from app.domains.identity.services import hash_password
+from app.main import app
 
 pytestmark = pytest.mark.asyncio
 
 DEMO_PASSWORD = "demo-pass-2026"
 
 
-@pytest_asyncio.fixture
-async def reservist_client(client, db_session):
-    user = User(id=uuid.uuid4(), username="reservist",
+async def _login_client(db_session, username, role, display):
+    """Отдельный AsyncClient на роль — cookie сессий не пересекаются."""
+    user = User(id=uuid.uuid4(), username=username,
                 password_hash=hash_password(DEMO_PASSWORD),
-                display_name="Петрова Марина", role=UserRole.RESERVIST)
+                display_name=display, role=role)
     db_session.add(user)
     await db_session.commit()
-    resp = await client.post("/api/auth/login",
-                             json={"username": "reservist", "password": DEMO_PASSWORD})
+
+    async def override_get_db():
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_get_db
+    http = AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
+    resp = await http.post("/api/auth/login",
+                           json={"username": username, "password": DEMO_PASSWORD})
     assert resp.status_code == 200, resp.text
-    return client
+    return http
 
 
 @pytest_asyncio.fixture
-async def reviewer_client(client, db_session):
-    user = User(id=uuid.uuid4(), username="reviewer",
-                password_hash=hash_password(DEMO_PASSWORD),
-                display_name="Смирнова Анна", role=UserRole.REVIEWER)
-    db_session.add(user)
-    await db_session.commit()
-    resp = await client.post("/api/auth/login",
-                             json={"username": "reviewer", "password": DEMO_PASSWORD})
-    assert resp.status_code == 200, resp.text
-    return client
+async def reservist_client(db_session):
+    http = await _login_client(db_session, "reservist", UserRole.RESERVIST,
+                               "Петрова Марина")
+    yield http
+    await http.aclose()
+
+
+@pytest_asyncio.fixture
+async def reviewer_client(db_session):
+    http = await _login_client(db_session, "reviewer", UserRole.REVIEWER,
+                               "Смирнова Анна")
+    yield http
+    await http.aclose()
 
 
 def _full_draft() -> dict:

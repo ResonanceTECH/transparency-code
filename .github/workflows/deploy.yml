@@ -1,0 +1,54 @@
+name: deploy
+
+# Push в main -> rsync исходников на сервер -> docker compose up -d --build.
+# Сервер собирает образы локально из исходников, GHCR не требуется.
+#
+# Требуются Secrets репозитория (Settings -> Secrets and variables -> Actions):
+#   DEPLOY_SSH_KEY — приватный SSH-ключ деплоя (публичная часть лежит на сервере
+#                    в /root/.ssh/authorized_keys)
+#   DEPLOY_HOST    — адрес сервера, например 135.106.155.218
+#   DEPLOY_USER    — пользователь на сервере, например root
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'docker-compose.yml'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          install -m 600 /dev/null ~/.ssh/deploy_key
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Sync sources to server
+        run: |
+          rsync -az --delete \
+            --exclude .git --exclude .github --exclude node_modules \
+            --exclude dist --exclude test-results --exclude playwright-report \
+            --exclude .env --exclude uploads --exclude .venv \
+            --exclude __pycache__ --exclude .DS_Store \
+            -e "ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes" \
+            ./ "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/root/transparency-code/"
+
+      - name: Rebuild and restart stack
+        run: |
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
+            "cd /root/transparency-code && docker compose up -d --build && curl -fsS --retry 10 --retry-delay 3 localhost/api/health"

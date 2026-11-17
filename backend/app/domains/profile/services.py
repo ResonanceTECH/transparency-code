@@ -80,6 +80,14 @@ async def get_or_create_profile(db: AsyncSession, user: User) -> Profile:
         db.add(profile)
         await db.flush()
         add_audit(db, profile, user, "Черновик профиля создан", AuditScope.PRIVATE)
+    else:
+        # selectinload не перечитывает уже загруженные коллекции identity-map
+        # объекта — при повторном обращении в той же сессии они устаревают.
+        for attr in ("service_periods", "relatives", "payment_blocks",
+                     "activities", "documents", "versions"):
+            await db.refresh(profile, [attr])
+        for block in profile.payment_blocks:
+            await db.refresh(block, ["records"])
     return profile
 
 
@@ -382,19 +390,23 @@ async def profile_signals(db: AsyncSession, profile_id: uuid.UUID,
 
 
 async def decide_signal(db: AsyncSession, signal_id: uuid.UUID, user: User,
-                        status: SignalStatus, comment: str) -> ProfileSignal | None:
+                        status: SignalStatus, comment: str
+                        ) -> ProfileSignalDecision | None:
     signal = await db.scalar(
         select(ProfileSignal).where(ProfileSignal.id == signal_id))
     if signal is None:
         return None
-    db.add(ProfileSignalDecision(signal_id=signal.id, status=status, comment=comment,
-                                 author_name=user.display_name))
+    decision = ProfileSignalDecision(signal_id=signal.id, status=status,
+                                     comment=comment,
+                                     author_name=user.display_name)
+    db.add(decision)
     signal.status = status
     profile = await db.scalar(select(Profile).where(Profile.id == signal.profile_id))
     if profile:
         add_audit(db, profile, user, f"Несоответствие «{signal.title}»: {status.value}",
                   AuditScope.SUBMITTED)
-    return signal
+    await db.flush()
+    return decision
 
 
 async def review_decision(db: AsyncSession, profile: Profile, user: User,
