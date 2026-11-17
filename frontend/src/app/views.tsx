@@ -918,7 +918,7 @@ export function ReportView(m: AppModel) {
         </div>
         <div>
           <small>Специалист</small>
-          <strong>{user}</strong>
+          <strong>{user?.display_name || user?.username}</strong>
         </div>
         <div>
           <small>Контекст</small>
