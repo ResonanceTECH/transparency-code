@@ -212,6 +212,13 @@ _CASE_DETAIL_OPTIONS = (
 )
 
 
+async def get_owned_case(db: AsyncSession, user: User, case_id: uuid.UUID) -> Case | None:
+    """Дело пользователя или None — seam для других доменов (MICROSERVICES.md §5)."""
+    return await db.scalar(
+        select(Case).where(Case.id == case_id, Case.owner_id == user.id)
+    )
+
+
 async def get_case_detail(db: AsyncSession, user: User, case_id: uuid.UUID) -> CaseDetailOut | None:
     """Полная карточка дела; `None` — нет дела или чужое (→ 404, SPEC.md §5.3)."""
     case = await db.scalar(
