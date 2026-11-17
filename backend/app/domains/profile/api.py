@@ -583,4 +583,4 @@ async def profile_rule_registry():
     return PROFILE_RULES
 
 
-__all__ = ["router", "ProfileDocument"]
+__all__ = ["ProfileDocument", "router"]

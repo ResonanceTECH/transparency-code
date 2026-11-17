@@ -105,7 +105,7 @@ async def delete_session(db: AsyncSession, token: str | None) -> None:
 
 
 async def seed_demo_user(db: AsyncSession) -> None:
-    """Идемпотентный сид demo-аккаунта из env (SPEC.md §4). Вызывать при старте."""
+    """Идемпотентный сид demo-аккаунтов из env (SPEC.md §4). Вызывать при старте."""
     settings = get_settings()
     if not settings.allow_demo_login:
         return
@@ -124,3 +124,22 @@ async def seed_demo_user(db: AsyncSession) -> None:
         # Пароль из env — источник истины для учебного контура.
         user.password_hash = hash_password(settings.demo_password)
         user.role = UserRole.SPECIALIST
+
+    # Учебные аккаунты ролей этапа 2: резервист и проверяющий (SPEC.md §10.3).
+    for username, display, role in (
+        ("reservist", "Петрова Марина · резервист (вым.)", UserRole.RESERVIST),
+        ("reviewer", "Смирнова Анна · проверяющий (вым.)", UserRole.REVIEWER),
+    ):
+        account = await get_user_by_username(db, username)
+        if account is None:
+            db.add(
+                User(
+                    id=uuid.uuid4(),
+                    username=username,
+                    password_hash=hash_password(settings.demo_password),
+                    display_name=display,
+                    role=role,
+                )
+            )
+        else:
+            account.role = role

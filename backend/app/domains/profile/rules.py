@@ -58,7 +58,8 @@ def check_period_order(snapshot: dict) -> list[dict]:
     for label, rows in (("службы", snapshot.get("service_periods", [])),
                         ("деятельности", snapshot.get("activities", []))):
         for row in rows:
-            start, end = _d(row.get("start_date") or row.get("period_from")), _d(row.get("end_date") or row.get("period_to"))
+            start = _d(row.get("start_date") or row.get("period_from"))
+            end = _d(row.get("end_date") or row.get("period_to"))
             if start and end and end < start:
                 out.append(_find(
                     "period-order", f"Период {label}: конец раньше начала",
@@ -168,7 +169,7 @@ def check_activity_outside_service(snapshot: dict) -> list[dict]:
 
 PROFILE_RULES: list[dict] = [
     {"id": "period-order", "title": "Согласованность периодов",
-     "description": "Дата окончания периода не может быть раньше даты начала (выплаты, служба, деятельность)."},
+     "description": "Дата окончания не может быть раньше даты начала (выплаты, служба, деятельность)."},
     {"id": "relative-without-kinship", "title": "Родство с участником СВО",
      "description": "Получатель «родственник — участник СВО» требует заполненного раздела родства."},
     {"id": "kinship-payments-missing", "title": "Выплаты родственникам",
