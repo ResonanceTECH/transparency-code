@@ -3,11 +3,6 @@
 import io
 import json
 
-import pytest
-from sqlalchemy import select
-
-from app.domains.documents.models import Document, DocumentStatus, Fact
-
 
 def _json_file(payload: dict, name: str = "facts.json") -> tuple[str, bytes, str]:
     return name, json.dumps(payload).encode(), "application/json"
