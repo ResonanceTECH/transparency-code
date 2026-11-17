@@ -39,3 +39,16 @@ npm ci
 npm run dev:prototype   # макет на http://127.0.0.1:4173/prototype, без бэкенда
 npm run dev             # интеграционный UI на :5173 (нужен backend на :8000)
 ```
+
+## CI/CD (GitHub Actions)
+
+Все workflows лежат в `.github/workflows/` и срабатывают только по релевантным путям:
+
+| Workflow | Триггер | Что делает |
+|---|---|---|
+| `frontend-ci.yml` | push/PR, `frontend/**` | `npm ci` → typecheck → build → Playwright-тесты макета |
+| `backend-ci.yml` | push/PR, `backend/**` | ruff + pytest; отдельный job: миграции на реальном PostgreSQL (`alembic upgrade head` + `alembic check`) |
+| `e2e.yml` | push в `main` и PR | собирает весь стек docker compose и гоняет `frontend/tests/flow.spec.ts` против `127.0.0.1:8080` |
+| `cd.yml` | push в `main` | собирает и пушит образы `backend`/`frontend` в GHCR (`latest` + `sha-*` + `main`) |
+
+Образы: `ghcr.io/<org>/transparency-code-backend` и `ghcr.io/<org>/transparency-code-frontend` — на любом сервере развёртывание сводится к `docker compose pull` + `up` (или `docker run` с env из `.env.example`).
