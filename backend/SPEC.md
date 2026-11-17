@@ -1,6 +1,6 @@
 # «Резонанс» — спецификация серверной части
 
-Версия 1.0 · 16.11.2026 · статус: требования к реализации
+Версия 1.1 · 17.11.2026 · статус: требования к реализации (этап 1 в работе)
 
 Документ фиксирует, что должна реализовывать серверная часть, на основе анализа клиентского кода (`frontend/`). Клиент — источник истины по контракту: все эндпоинты, схемы данных и сценарии ниже восстановлены из `frontend/src/app/` (`api.ts`, `types.ts`, `AppShell`/views), `frontend/tests/flow.spec.ts`, `frontend/vite.config.ts` и `frontend/nginx.conf`.
 
@@ -63,7 +63,9 @@ transparency-code/
 - **Формат.** JSON in / JSON out. `Content-Type: application/json` для всех тел, кроме multipart-загрузки файлов (`FormData`, поле `file`).
 - **Критично:** клиентский `api()` всегда вызывает `response.json()`. **Любой ответ должен быть валидным JSON** — включая `POST /auth/logout`, `POST /cases/:id/demo`, `POST /cases/:id/confirm-facts`, `POST /cases/:id/analysis-runs`. Пустое тело или `204` сломают клиент. Для «пустых» операций возвращать `200` + `{}` или `{"ok": true}`.
 - **Ошибки.** Единый формат `{"detail": "<человекочитаемое сообщение на русском>"}` (совместимо с FastAPI `HTTPException`). Клиент маппит: `401` → сброс сессии; `422` → «Проверьте обязательные поля, формат дат и значений.»; прочие → «Запрос не выполнен. Проверьте подключение к серверу.» Доменные ошибки должны возвращать `detail` строкой; ошибки валидации Pydantic могут оставаться стандартными (массив `detail`).
-- **Время.** `created_at` — ISO 8601 UTC с `Z` (клиент дописывает `Z` при отсутствии, но лучше отдавать сразу с зоной).
+- **Время.** `created_at` — ISO 8601 UTC с `Z` (клиент дописывает `Z` при отсутствии, но лучше отдавать сразу с зоной). Pydantic `datetime` сериализуется с офсетом — приводить к UTC.
+- **Маппинг имён полей API ↔ БД** (клиент ждёт именно эти имена): `Fact.date` ← `facts.fact_date`; `Fact.document_name` ← `documents.filename` (join, `""` если документа нет); `Signal.rule` ← `signals.rule_id`; `Document.name` ← `documents.filename`.
+- **OpenAPI-гигиена.** Каждый эндпоинт: `response_model`, явный `status_code`, русский `summary`/docstring, тег домена (`identity`, `cases`, `documents`, `analysis`, `reporting`, `platform`). Ошибки `4xx` документируются в `responses={}` где неочевидно (401/404/409). Цель — Swagger читается как контракт без чтения кода.
 - **Скачивание файлов** — единственный не-JSON ответ: `GET /api/cases/{id}/documents/{doc_id}` возвращает байты с `Content-Disposition: attachment` (клиент ходит по прямой ссылке `<a href>`, не через `api()`).
 - **Swagger.** `GET /openapi.json` — стандартный FastAPI; `GET /docs` обслуживается nginx из `frontend/public/docs` (офлайн Swagger UI), backend ничего для него делать не должен, кроме корректного OpenAPI.
 
@@ -114,7 +116,7 @@ transparency-code/
 ]
 ```
 
-`status ∈ {"draft","attention","completed"}` (семантика — раздел 8.1), `stale` — вычисляемый флаг (8.2).
+`status ∈ {"draft","attention","completed"}` — вычисляемая семантика (раздел 7.1): `draft` — нет ни одного запуска; `attention` — последний запуск содержит ожидающие сигналы (`pending_count > 0`); `completed` — последний запуск есть и `pending_count = 0` (включая запуск с 0 сигналов). `stale` — вычисляемый флаг (7.2). `signals_count` — число сигналов последнего запуска. `owner_id` — изоляция: пользователь видит только свои дела; чужой `id` → `404` (не `403`, чтобы не раскрывать существование).
 
 **`POST /api/cases`** — создание дела. Тело (клиент шлёт из формы «Новая проверка» и из демо-сценариев):
 
@@ -124,8 +126,8 @@ transparency-code/
 
 - `basis ∈ {"candidate","expense_review"}`; `name` 2–200 симв.; `department` ≤ 200 (клиент подставляет «Учебное подразделение» при пустом); `year` 2000–2100; `synthetic` должен быть `true` — сервер отклоняет `false` (`422`) до появления реального контура.
 - `→ 201/200 CaseSummary` (клиент использует `id` для перехода к документам).
-- Номер `number` генерирует сервер: формат `PR-<year>-<seq:04d>` (e2e проверяет, что скачанный отчёт называется `PR-*.json`).
-- Побочный эффект: событие в `case_events` («Дело создано»).
+- Номер `number` генерирует сервер: `PR-<year>-<seq:04d>`, последовательность — **внутри года** дела (`year` из запроса), атомарно под блокировкой строки/sequence. Пример: `PR-2025-0001`. Клиент парсит только имя файла отчёта.
+- `→ 201 CaseSummary`. Побочный эффект: событие `case_events` в формате «Короткое: детали» — `«Дело создано: {name}»` (клиент показывает `message.split(':')[0]` как заголовок — формат с двоеточием обязателен).
 
 **`GET /api/cases/{id}`** → `CaseDetail` — карточка дела: summary + `facts[]`, `documents[]`, `runs[]` (полные, с `signals[].evidence[]` и `signals[].decisions[]`), `events[]`. `404` при чужом/несуществующем id.
 
@@ -277,7 +279,7 @@ cases ──< case_events
 | `facts` | `id uuid pk`, `case_id fk`, `document_id fk null`, `field`, `label`, `value text`, `object_id`, `fact_date date null`, `unit`, `snippet`, `confirmed bool default false`, `created_at`, `updated_at` | `document_name` в API собирается из `documents.filename` |
 | `analysis_runs` | `id uuid pk`, `case_id fk`, `rule_version`, `enabled_rules jsonb`, `input_hash char(64)`, `warnings jsonb`, `created_at`, `author` | иммутабельны после создания |
 | `signals` | `id uuid pk`, `run_id fk`, `case_id fk`, `rule_id`, `title`, `explanation`, `action`, `status default 'unreviewed'`, `sort int`, `created_at` | `status ∈ unreviewed/clarification/resolved/further_review` |
-| `signal_facts` | `signal_id fk`, `fact_id fk`, `ordinal int`, pk `(signal_id, fact_id)` | связь «сигнал ↔ значения-основания»; в API `evidence` = `Fact[]` |
+| `signal_facts` | `signal_id fk`, `fact_id fk`, `ordinal int`, `fact_snapshot jsonb`, pk `(signal_id, fact_id)` | связь «сигнал ↔ значения-основания»; `fact_snapshot` — слепок `Fact` на момент запуска (evidence иммутабельно); в API `evidence` = `Fact[]` из слепка |
 | `decisions` | `id uuid pk`, `signal_id fk`, `status`, `comment`, `author`, `created_at` | append-only |
 | `case_events` | `id uuid pk`, `case_id fk`, `message`, `author`, `created_at` | лента «История действий» |
 
@@ -287,7 +289,8 @@ cases ──< case_events
 
 ### 7.1 Статусы дела и сигналов
 
-- `CaseSummary.status`: `draft` — ни одного запуска анализа; `attention` — последний запуск содержит сигналы, требующие рассмотрения (`pending_count > 0`); `completed` — последний запуск есть и все его сигналы в финальных статусах. *Точная семантика `pending_count` — открытый вопрос № 1 (кандидат: сигналы последнего запуска со статусом ≠ `resolved`).*
+- `CaseSummary.status`: `draft` — ни одного запуска анализа; `attention` — последний запуск содержит сигналы, требующие рассмотрения; `completed` — последний запуск есть и `pending_count = 0`.
+- `pending_count` = число сигналов **последнего** запуска со `status ≠ 'resolved'` (`unreviewed`, `clarification`, `further_review` — все «ожидающие»). `signals_count` = все сигналы последнего запуска.
 - `Signal.status`: `unreviewed` → `clarification | resolved | further_review` по решению специалиста. `further_review` и `clarification` остаются «ожидающими».
 - Отображаемые русские ярлыки — забота клиента (`statusLabels`); сервер хранит канонические коды.
 
@@ -321,8 +324,8 @@ cases ──< case_events
 
 - **Реестр правил** — пакет `app/domains/analysis/rules/`: каждый модуль экспортирует `Rule{id, title, description, version?, evaluate(ctx) -> CandidateSignal[]}`. `ctx` — иммутабельный снапшот: реквизиты дела + факты (проиндексированные по `field`/`object_id`, с `confirmed`, `value`, `date`, `unit`). Детерминизм: без I/O, без случайности, без времени.
 - **`rule_version`** — semver реестра (например, `0.1.0`), пишется в каждый запуск; сохранённые запуски не пересчитываются.
-- **Снапшот и `input_hash`**: каноническая сериализация входа (case meta + все факты, отсортированные по `id`, включая `confirmed`) → SHA-256 hex. Одинаковый вход → одинаковый hash (важно для e2e: повторный анализ без изменений должен давать воспроизводимый результат).
-- **Сигнал**: `{rule_id, title, explanation, action, evidence_fact_ids[], sort}` → строки `signals` + `signal_facts`. `evidence` в API — полные `Fact` (с `document_name`, `snippet`).
+- **Снапшот и `input_hash`**: каноническая сериализация входа — **все** факты дела (включая `confirmed`, `value`, `date`, `unit`, `object_id`, `field`, `document_id`), отсортированные по `id`, + реквизиты дела (`basis`, `year`, `name`) → SHA-256 hex. Одинаковый вход → одинаковый hash (важно для e2e: повторный анализ без изменений должен давать воспроизводимый результат). Функция `compute_input_hash` живёт в `analysis`-домене и используется также при вычислении `stale` в `cases` (зафиксированный шов — MICROSERVICES.md §5).
+- **Сигнал**: `{rule_id, title, explanation, action, evidence_fact_ids[], sort}` → строки `signals` + `signal_facts`. В `signal_facts.fact_snapshot` пишется **слепок `Fact`** (включая `document_name`) на момент запуска — архивные запуски показывают исторические значения даже после `PATCH /facts` (решение открытого вопроса № 9: иммутабельность runs важнее живой ссылки). `fact_id` сохраняется для целостности связей.
 - **`warnings`**: предупреждения о качестве данных (например, «есть неподтверждённые поля», «неизвестные field пропущены») — `string[]`, показываются клиентом как `Notice warning`.
 - **Покрытие минимум:** правила, воспроизводящие e2e-сценарии — пропуск дохода от продажи (`sale_amount` vs заявленные доходы) и расхождение остатков обязательства; плюс правила из `GET /rules` (тумблер «Сопоставление обязательств»). Точные id правил клиент не раскрывает — см. открытый вопрос № 2.
 
@@ -341,7 +344,7 @@ cases ──< case_events
 - **Валидация:** Pydantic-схемы на входе; доменные ограничения (enum'ы, длины, `synthetic=true`) — `422` со строковым `detail`.
 - **БД:** только параметризованные запросы (SQLAlchemy), миграции через Alembic, никаких `eval`/`exec`.
 - **Секреты:** только env (`SECRET_KEY`, `DATABASE_URL`, `DEMO_*`, `UPLOAD_DIR`); в репозитории — `.env.example` без значений.
-- **Данные:** синтетический контур — `synthetic=false` отклоняется; логирование без ПДн; ответам запрещено кэшироваться приватно (`Cache-Control: no-store` для `/api/*` — опционально, но желательно).
+- **Данные:** синтетический контур — `synthetic=false` отклоняется; логирование без ПДн; `Cache-Control: no-store` на все `/api/*` ответы (middleware) — приватные данные не кэшируются.
 - **Отказоустойчивость:** ошибки домена — `4xx` с `detail`; непредвиденные — `500 {"detail":"Внутренняя ошибка сервера"}` + лог; клиент показывает общий текст.
 
 ## 9. Конфигурация и развёртывание
@@ -381,15 +384,15 @@ Dev-запуск: `uvicorn app.main:app --reload --port 8000` из `backend/`; `
 
 ## 11. Открытые вопросы
 
-1. **`pending_count`/`status` дела:** точная семантика — предположительно «сигналы последнего запуска со статусом ≠ resolved». Подтвердить.
+1. ~~**`pending_count`/`status` дела**~~ — **решено (v1.1):** `pending_count` = сигналы последнего запуска со `status ≠ 'resolved'`; `status`: `draft` (нет runs) / `attention` (pending>0) / `completed` (pending=0).
 2. **Реестр правил:** точные `id`/`title`/`description` для `GET /rules` и `signal.rule` — клиент показывает их, но не раскрывает полный список. Нужен канонический список (e2e требует минимум два правила).
-3. **Снапшот анализа:** входят ли все факты или только `confirmed`? Влияет на `input_hash` и момент «устаревания».
-4. **Формат `CaseDetail.events.message`:** клиент показывает `message.split(':')[0]` как заголовок — формат «Короткое: детали» де-факто обязателен.
-5. **Нумерация `number`:** подтверждён только префикс `PR-`; формат суффикса — на усмотрение сервера (клиент парсит только `.json`-имя файла).
-6. **Мультипользовательность:** один demo-аккаунт или несколько пользователей с изоляцией дел (`owner_id` заложен, но UI не различает пользователей)?
+3. ~~**Снапшот анализа**~~ — **решено (v1.1):** все факты дела + реквизиты; `confirmed` — часть снапшота.
+4. ~~**Формат `CaseDetail.events.message`**~~ — **решено (v1.1):** обязателен формат «Короткое: детали».
+5. ~~**Нумерация `number`**~~ — **решено (v1.1):** `PR-<year>-<seq:04d>`, seq внутри года.
+6. **Мультипользовательность:** `owner_id`-изоляция реализована; UI не различает пользователей — один demo-аккаунт для этапа 1.
 7. **Извлечение PDF/DOCX:** точный «учебный шаблон» не формализован — нужна спека маркеров полей (кто её пишет: backend или аналитик?).
 8. **Async-конвейер:** достаточно ли синхронного извлечения (учебные файлы малы) или нужен worker/очередь?
-9. **`evidence` в сигналах:** ссылаться на живые `facts` или хранить слепок значений в `signal_facts`? Влияет на корректность архивных запусков после `PATCH /facts` — рекомендуется слепок.
+9. ~~**`evidence` в сигналах**~~ — **решено (v1.1):** слепок `Fact` в `signal_facts.fact_snapshot`.
 10. **Отчёт:** клиент не парсит `/report` — допустима любая JSON-схема; для печатного PDF клиент использует `window.print()` на своём рендере.
 
 ## 12. Критерии приёмки (минимум)

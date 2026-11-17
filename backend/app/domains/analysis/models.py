@@ -77,7 +77,11 @@ class Signal(Base):
 
 
 class SignalFact(Base):
-    """Связь «сигнал ↔ факт-основание» с порядком (SPEC.md §6)."""
+    """Связь «сигнал ↔ факт-основание» с порядком и слепком (SPEC.md §6, §7.5).
+
+    `fact_snapshot` — сериализованный `Fact` на момент запуска: evidence
+    иммутабельно и не меняется после `PATCH /facts`.
+    """
 
     __tablename__ = "signal_facts"
 
@@ -88,6 +92,7 @@ class SignalFact(Base):
         ForeignKey("facts.id", ondelete="CASCADE"), primary_key=True, index=True
     )
     ordinal: Mapped[int] = mapped_column(Integer, default=0)
+    fact_snapshot: Mapped[dict] = mapped_column(JSONType, default=dict)
 
     signal: Mapped[Signal] = relationship(back_populates="evidence_links")
     fact: Mapped["Fact"] = relationship()
