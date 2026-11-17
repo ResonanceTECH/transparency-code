@@ -385,6 +385,49 @@ async def test_export_result(reservist_client, reviewer_client):
         f"/api/reviewer/profiles/{pid}/export")).status_code == 403
 
 
+async def test_reviewer_income_summary(reservist_client, reviewer_client):
+    """SPEC §10.8: сводка «Сведения о доходах» — только monetary, без non_monetary/in_kind."""
+    draft = _full_draft()
+    blocks = {b["category"]: b for b in draft["payments"]}
+    blocks["one_time"].update(answer="yes", records=[{
+        "title": "Единовременная выплата", "form": "monetary", "amount": "50000.00"}])
+    blocks["housing"].update(answer="yes", records=[{
+        "title": "Субсидия на жильё", "form": "monetary", "amount": "120000.00",
+        "housing_kind": "subsidy", "document_ref": "Приказ №5 от 01.02.2025"}])
+    blocks["support"].update(answer="yes", records=[{
+        "title": "Региональная поддержка", "form": "in_kind", "amount": "999.00",
+        "level": "regional", "document_ref": "Решение №12"}])
+    blocks["non_monetary"].update(answer="yes", records=[{
+        "title": "Предоставление техники", "form": "monetary", "amount": "777.00",
+        "document_ref": "Акт №3"}])
+    blocks["family"].update(answer="yes", records=[{
+        "title": "Выплата супруге", "form": "monetary", "amount": "30000.00",
+        "recipient_kind": "family_member", "recipient_name": "Петров И.И."}])
+
+    r = await reservist_client.put("/api/profile", json=draft)
+    assert r.status_code == 200, r.text
+    r = await reservist_client.post(
+        "/api/profile/documents",
+        files={"file": ("diploma.json", b'{"synthetic": true, "kind": "diploma"}',
+                        "application/json")},
+        data={"kind": "diploma"})
+    assert r.status_code == 201, r.text
+    assert (await reservist_client.get("/api/profile/completeness")).json()["can_submit"]
+    r = await reservist_client.post("/api/profile/submit")
+    assert r.status_code == 201, r.text
+
+    pid = (await reviewer_client.get("/api/reviewer/queue")).json()[0]["profile_id"]
+    r = await reviewer_client.get(f"/api/reviewer/profiles/{pid}")
+    assert r.status_code == 200, r.text
+    summary = r.json()["income_summary"]
+    # 50000 + 120000 + 30000; in_kind (999) и non_monetary (777) исключены
+    assert summary["total"] == "200000.00"
+    assert summary["records"] == 3
+    assert summary["currency"] == "RUB"
+    by_cat = {c["category"]: c["total"] for c in summary["by_category"]}
+    assert by_cat == {"family": "30000.00", "housing": "120000.00", "one_time": "50000.00"}
+
+
 # ---------- справочник ----------
 
 

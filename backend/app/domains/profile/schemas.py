@@ -276,6 +276,21 @@ class ContactOut(BaseModel):
     email: str
 
 
+class IncomeCategoryTotal(BaseModel):
+    category: str
+    total: str
+
+
+class IncomeSummaryOut(BaseModel):
+    """Финансовая сводка «Сведения о доходах» (SPEC §10.8): только денежные
+    поступления (`form=monetary`); `non_monetary`/`in_kind` не входят."""
+
+    currency: str = "RUB"
+    total: str
+    records: int
+    by_category: list[IncomeCategoryTotal]
+
+
 class ReviewerProfileOut(BaseModel):
     """Карточка проверяющего: последняя опубликованная версия + сигналы + переписка."""
 
@@ -288,6 +303,7 @@ class ReviewerProfileOut(BaseModel):
     messages: list[MessageOut]
     reviews: list["ReviewOut"]
     assigned_reviewer: str
+    income_summary: IncomeSummaryOut
 
 
 class ReviewOut(BaseModel):

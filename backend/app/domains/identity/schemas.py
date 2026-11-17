@@ -12,5 +12,7 @@ class UserOut(BaseModel):
     """Публичная карточка пользователя — только то, что ждёт клиент."""
 
     username: str
+    display_name: str = ""
+    role: str = ""  # specialist | reservist | reviewer — клиент строит контур по роли
 
     model_config = {"from_attributes": True}
