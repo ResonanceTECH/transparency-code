@@ -28,15 +28,21 @@ _PROTECTED_ROUTERS = (cases_api, documents_api, analysis_api, reporting_api, pro
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    """Сид demo-аккаунта при старте; недоступная БД не роняет healthcheck."""
+    """Сид demo-аккаунтов при старте; недоступная БД не роняет healthcheck."""
     if get_settings().allow_demo_login:
+        # Сиды независимы и в разных сессиях: падение одного не откатывает другой.
         try:
             async with get_session_factory()() as session:
                 await identity_services.seed_demo_user(session)
-                await profile_services.seed_contacts(session)
                 await session.commit()
         except Exception:
             logger.warning("Не удалось создать demo-пользователя (БД недоступна?)", exc_info=True)
+        try:
+            async with get_session_factory()() as session:
+                await profile_services.seed_contacts(session)
+                await session.commit()
+        except Exception:
+            logger.warning("Не удалось засеять справочник контактов", exc_info=True)
     yield
 
 

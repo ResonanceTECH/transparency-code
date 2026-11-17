@@ -503,12 +503,11 @@ async def decide_profile(profile_id: uuid.UUID, data: ReviewDecisionIn,
 async def decide_signal(signal_id: uuid.UUID, data: SignalDecisionIn,
                         user: User = Depends(require_reviewer),
                         db: AsyncSession = Depends(get_db)):
-    signal = await svc.decide_signal(db, signal_id, user,
-                                     SignalStatus(data.status), data.comment)
-    if signal is None:
+    decision = await svc.decide_signal(db, signal_id, user,
+                                       SignalStatus(data.status), data.comment)
+    if decision is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Несоответствие не найдено")
     await db.commit()
-    decision = signal.decisions[-1]
     return SignalDecisionOut(id=decision.id, status=decision.status,
                              comment=decision.comment,
                              author_name=decision.author_name,
