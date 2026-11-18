@@ -6,15 +6,12 @@ No third-party dependencies. Run from anywhere:
 
 import hashlib
 import json
+import textwrap
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 FRONTEND = HERE.parent
-HAKATHON = FRONTEND.parent.parent
 TARGETS = [FRONTEND / "public" / "samples"]
-EXPORT = HAKATHON / "front" / "public" / "samples"
-if EXPORT.parent.exists():
-    TARGETS.append(EXPORT)
 
 DOCS = [
     ("Диплом_переподготовка.pdf", "Диплом о профессиональной переподготовке"),
@@ -28,6 +25,7 @@ DOCS = [
     ("Договор_преподавание.pdf", "Договор на преподавательскую деятельность"),
     ("Решение_региональная_поддержка_демо.pdf", "Решение о региональной поддержке"),
     ("Подтверждающий_документ_результата.pdf", "Подтверждающее основание результата рассмотрения"),
+    ("Согласие_ПДн_учебный.pdf", "Учебный пример подписанного согласия на обработку ПДн"),
 ]
 
 CYRILLIC = {
@@ -52,12 +50,10 @@ def pdf_escape(value: str) -> str:
 
 
 def make_pdf(title: str, lines: list[str]) -> bytes:
-    title_ascii = ascii_text(title)
-    content_lines = [f"BT /F1 18 Tf 72 760 Td ({pdf_escape(title_ascii)}) Tj"]
-    content_lines.append("/F1 11 Tf")
-    y = 730
-    for line in ["RESONANCE - SYNTHETIC DESIGN SAMPLE", *lines]:
-        content_lines.append(f"0 -22 Td ({pdf_escape(ascii_text(line))}) Tj")
+    content_lines = ["BT /F1 12 Tf 48 790 Td (RESONANCE - SYNTHETIC DESIGN SAMPLE) Tj", "/F1 10 Tf"]
+    for line in [title, *lines]:
+        for part in textwrap.wrap(ascii_text(line), width=85):
+            content_lines.append(f"0 -20 Td ({pdf_escape(part)}) Tj")
     content_lines.append("ET")
     stream = "\n".join(content_lines)
 
@@ -82,49 +78,74 @@ def make_pdf(title: str, lines: list[str]) -> bytes:
     return body.encode("ascii")
 
 
-def make_data():
-    return {
-        "synthetic": True,
-        "design_mockup": True,
-        "profile": {
-            "id": "РВ-2026-0147",
-            "person": {
-                "full_name": "Ковалёв Алексей Сергеевич",
-                "birth_year": 1987,
-                "phone": "+7 (000) 000-01-47",
-                "email": "kovalev@reservist.example",
-                "region": "Липецкая область",
-            },
-            "program": {
-                "name": "Герои Липецкой земли",
-                "year": 2025,
-                "flow": "Первый поток",
-                "program_year": 2024,
-            },
-            "service_periods": [
-                {"kind": "Военная служба", "category": "Старший офицерский состав", "from": "2023-06-01", "to": "2025-08-31"},
-                {"kind": "Иное место работы", "organization": "Учебный центр «Регион»", "from": "2025-09-01", "to": None},
-            ],
-            "kinship": {
-                "has_relative": True,
-                "relative": "Ковалёв Сергей Петрович",
-                "degree": "Родитель",
-                "status": "Участвовал",
-            },
-            "payments": [
-                {"category": "Денежное довольствие", "amount": "1 200 000", "basis": "Приказ о назначении", "period": "2023-06-01/2025-08-31"},
-                {"category": "Надбавки", "amount": "150 000", "basis": "Назначение Н-42", "period": "2025"},
-                {"category": "Единовременная выплата", "amount": "150 000", "basis": "Назначение Н-42", "payment_date": "2025-09-18"},
-                {"category": "Компенсация за родственника", "amount": "320 000", "basis": "Решение № К-24", "period": "2025-04"},
-                {"category": "Выплата супруге", "amount": "120 000", "recipient": "Ковалёва Мария Андреевна"},
-            ],
-            "signals": [
-                {"code": "РО-01", "title": "Основание выплаты за родственника уточнено"},
-                {"code": "ДУ-01", "title": "Возможный повторный учёт Н-42"},
-                {"code": "ДЕ-01", "title": "Период преподавания пересекается со службой"},
-            ],
-        }
+def make_data(manifest):
+    # Этот JSON импортируется интерфейсом: формы и печать не имеют второй копии демо-данных.
+    lookup = {item["name"]: item for item in manifest}
+    sections = ["Программа «Время героев»", "Акт о включении в резерв", "Довольствие и надбавки",
+                "Единовременная выплата · при наличии", "Выплата за родственника", "Выплата члену семьи",
+                "Материальная помощь", "Жилищная мера", "Дополнительная деятельность"]
+    ids = ["diploma", "reserve", "order", "one-time", "insurance", "family", "aid", "housing", "activity"]
+    attachments = [dict(id="sample-" + id_, name=name, url="/samples/" + name,
+                        size=lookup[name]["size"], format="pdf", section=section, kind="basis", origin="sample")
+                   for (name, _), id_, section in zip(DOCS[:9], ids, sections)]
+    profile = {
+        "candidate": {
+            "fullName": "Ковалёв Алексей Сергеевич", "birthYear": "1987",
+            "workplace": "Учебный центр «Регион»", "workStatus": "Находится в запасе",
+            "phone": "+7 (000) 000-01-47", "email": "kovalev@reservist.example",
+            "reportingPeriod": "2023–2026", "region": "Липецкая область", "flow": "Первый поток",
+            "programYear": "2024", "regionalProgram": "Герои Липецкой земли", "regionalProgramYear": "2025",
+            "appointmentAuthority": "ОИВ субъекта Российской Федерации", "organizer": "Учебный центр «Резерв»",
+            "diplomaDetails": "ДП-2024-0147 от 20.12.2024", "reserveActDetails": "№ 147-Р от 14.09.2025",
+            "diplomaDocumentId": "sample-diploma", "reserveActDocumentId": "sample-reserve",
+        },
+        "servicePeriods": [
+            dict(id="service-military", kind="Военная служба", category="Старший офицерский состав",
+                 organization="Учебное ведомство", start="2023-06-01", end="2025-08-31"),
+            dict(id="service-work", kind="Иное", category="Не применяется",
+                 organization="Учебный центр «Регион»", start="2025-09-01", end=""),
+        ],
+        "relativeAnswer": "Да",
+        "kinship": dict(fullName="Ковалёв Сергей Петрович", degree="Родитель", status="Участвовал", receivedPayments="Да"),
+        "familyRecipients": [dict(id="recipient-spouse", fullName="Ковалёва Мария Андреевна", relation="Супруга", year="1989")],
+        "categoryAnswers": {str(i): "Нет" if i in (5, 9) else "Планируется" if i == 8 else "Да" for i in range(10)},
+        "supportLevels": {"Федеральный": "Нет", "Региональный": "Да", "Муниципальный": "Нет"},
+        "personalInsuranceAnswer": "Нет",
+        "records": {
+            "0": [dict(id="payment-allowance", title="Денежное довольствие", amount="1 200 000",
+                       basis="Приказ о назначении на должность", periodFrom="2023-06-01", periodTo="2025-08-31",
+                       payer="Учебное ведомство", recipient="Ковалёв Алексей Сергеевич", documentId="sample-order")],
+            "1": [dict(id="payment-extra", title="Дополнительная выплата по назначению Н-42", amount="150 000",
+                       basis="Учебный приказ о назначении · приложение № 2", periodFrom="2023-06-01", periodTo="2025-08-31",
+                       payer="Учебное ведомство", recipient="Ковалёв Алексей Сергеевич", assignmentId="Н-42", documentId="sample-order")],
+            "2": [dict(id="payment-onetime", title="Единовременная выплата по назначению Н-42", eventKind="Завершение периода службы",
+                       eventDate="2025-08-31", recipientKind="Сам резервист", recipient="Ковалёв Алексей Сергеевич",
+                       amount="150 000", payer="Учебное ведомство", basis="Учебный акт № 42 · редакция от 01.06.2025",
+                       periodFrom="2023-06-01", periodTo="2025-08-31", paymentDate="2025-09-18", assignmentId="Н-42", documentId="sample-one-time")],
+            "3": [dict(id="payment-support", level="Региональный", authority="Учебный региональный орган",
+                       title="Региональная мера поддержки участника", code="РМ-17", paymentDate="2025-04-11",
+                       recipient="Ковалёв Алексей Сергеевич", amount="120 000", basis="Учебное решение № РМ-17", documentId="")],
+            "4": [dict(id="payment-insurance", title="Компенсация по решению органа", recipientKind="Резервист за родственника",
+                       recipient="Ковалёв Алексей Сергеевич", basisType="За личное участие", basis="Решение № К-24 от 24.04.2025",
+                       paymentDate="2025-04-30", periodFrom="2025-04-01", periodTo="2025-04-30", amount="320 000", documentId="sample-insurance")],
+            "5": [],
+            "6": [dict(id="payment-family", title="Выплата супруге за резервиста", recipientId="recipient-spouse",
+                       amount="120 000", basis="Учебное решение о выплате члену семьи", paymentDate="2025-05-12", documentId="sample-family")],
+            "7": [dict(id="payment-aid", title="Помощь для учебной и экспертной деятельности", form="Натуральная",
+                       organization="Учебный фонд «Поддержка»", recipient="Ковалёв Алексей Сергеевич",
+                       description="Ноутбук для учебной деятельности", basis="Учебное письмо фонда № Ф-12", documentId="sample-aid")],
+            "8": [dict(id="payment-housing", expectedYear="", title="В очереди · получение планируется",
+                       basis="Учебное решение № Ж-09 от 31.10.2026", housingKind="Субсидия", decisionDate="2024-10-02",
+                       acquisitionDate="2024-11-12", documentId="sample-housing")],
+            "9": [],
+        },
+        "activityAnswer": "Да",
+        "activities": [dict(id="activity-teaching", organization="Учебный университет", kind="Преподавание",
+                            engagement="Гражданско-правовой договор", periodFrom="2025-04-01", periodTo="2025-06-30",
+                            basis="Договор № П-18/25 от 24.03.2025", documentId="sample-activity")],
+        "attachments": attachments, "consentDocumentId": "", "photo": None,
     }
+    return dict(synthetic=True, design_mockup=True, profile_id="РВ-2026-0147", profile=profile)
 
 
 def main():
@@ -136,6 +157,8 @@ def main():
                 f"File: {name}",
                 "All persons, sums and documents are fictional.",
                 "Not an official authority document. No OCR was used.",
+                *( ["Demo signature: SYNTHETIC ONLY. Not an actual consent or signature.",
+                    "For a real submission use the operator's approved consent form."] if "Согласие" in name else [] ),
             ])
             (target / name).write_bytes(payload)
             manifest.append({
@@ -149,7 +172,7 @@ def main():
             encoding="utf-8",
         )
         (target / "profile.json").write_text(
-            json.dumps(make_data(), ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+            json.dumps(make_data(manifest), ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
         )
         print(f"Generated {len(DOCS)} PDFs + 2 JSON files in {target}")
 

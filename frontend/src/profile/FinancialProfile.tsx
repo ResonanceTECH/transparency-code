@@ -9,6 +9,7 @@ import {
   LockKeyhole,
   LogOut,
   Menu,
+  Printer,
   ShieldCheck,
   UserRound,
   X
@@ -35,8 +36,9 @@ import {
   HistoryScreen,
   InstructionsScreen
 } from './screens'
-import { person, responsibleContacts, headings, documents } from './data'
-import { Panel, PanelTitle, Notice } from './ui'
+import { PrintScreen, TemplatesScreen } from './print'
+import { responsibleContacts, headings } from './data'
+import { Panel, Notice } from './ui'
 import './financial-profile.css'
 
 export type PrototypeUser = { username: string; display_name: string; role: string }
@@ -45,14 +47,16 @@ export default function FinancialProfile({
   role: initialRole,
   user,
   onLogout,
-  onQuickLogin
+  onQuickLogin,
+  authenticated = true
 }: {
   role: 'reservist' | 'reviewer'
   user: PrototypeUser
   onLogout: () => void
   onQuickLogin: () => void
+  authenticated?: boolean
 }) {
-  const m = useProfileModel(initialRole)
+  const m = useProfileModel(initialRole, authenticated ? user.display_name : '')
   const {
     role,
     screen,
@@ -64,7 +68,6 @@ export default function FinancialProfile({
     toast,
     setToast,
     sent,
-    version,
     navigate,
     nav,
     activeNav,
@@ -81,11 +84,13 @@ export default function FinancialProfile({
     .join('')
     .toUpperCase()
   const roleLabel = role === 'reservist' ? 'Резервист' : 'Проверяющий'
+  const closedEditing = role === 'reservist' && m.reviewerClosed
+    && ['profile', 'kinship', 'payments', 'category', 'payment', 'support', 'insurance', 'housing', 'activities', 'selfcheck'].includes(screen)
   const modalRef = useRef<HTMLElement | null>(null)
   const lastFocused = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
-    if (!preview) return
+    if (!preview || !authenticated) return
     lastFocused.current = document.activeElement as HTMLElement | null
     const focusable = () =>
       Array.from(
@@ -117,7 +122,10 @@ export default function FinancialProfile({
       document.removeEventListener('keydown', onKeyDown)
       lastFocused.current?.focus()
     }
-  }, [preview, setPreview])
+  }, [preview, setPreview, authenticated])
+
+  // Модель сохраняется между учебными аккаунтами, но данные не остаются в DOM гостя.
+  if (!authenticated) return null
 
   return (
     <div className="fp-shell">
@@ -148,9 +156,9 @@ export default function FinancialProfile({
               aria-label={item.title}
               className={activeNav === item.screen ? 'active' : ''}
               onClick={() => navigate(item.screen)}
-              disabled={role === 'reviewer' && !sent && item.screen !== 'queue' && item.screen !== 'instructions'}
+               disabled={role === 'reviewer' && !sent && !['queue', 'instructions', 'templates'].includes(item.screen)}
               title={
-                role === 'reviewer' && !sent && item.screen !== 'queue' && item.screen !== 'instructions'
+                 role === 'reviewer' && !sent && !['queue', 'instructions', 'templates'].includes(item.screen)
                   ? 'Доступно после отправки версии резервистом'
                   : item.title
               }
@@ -183,7 +191,7 @@ export default function FinancialProfile({
           </div>
           <div className="fp-sidebar-version">
             <ShieldCheck size={14} />
-            Макет интерфейса · 10.11.2026
+            Макет интерфейса · 19.11.2026
           </div>
         </div>
       </aside>
@@ -227,12 +235,12 @@ export default function FinancialProfile({
               </div>
               <ChevronDown size={14} />
             </div>
-            <button className="fp-icon-button" aria-label="Выйти" onClick={onLogout} title="Выйти">
+            <button className="fp-icon-button" aria-label="Выйти" onClick={() => { m.log('Выход из учебного кабинета'); onLogout() }} title="Выйти">
               <LogOut size={17} />
             </button>
           </div>
         </header>
-        <main className="fp-main" id="fp-main">
+        <main className="fp-main" id="fp-main" tabIndex={-1}>
           <div className={`fp-page-header ${screen === 'home' ? 'fp-page-header-home' : ''}`}>
             <div>
               <div className="fp-breadcrumb">
@@ -249,8 +257,19 @@ export default function FinancialProfile({
               </h1>
               {headings[screen][1] && <p>{headings[screen][1]}</p>}
             </div>
+            {screen !== 'print' && screen !== 'templates' && <button className="fp-button fp-button-outline"
+              disabled={role === 'reviewer' && !sent} onClick={() => navigate('print')}>
+              <Printer size={16} />Печать
+            </button>}
           </div>
-          {protectedReviewerScreen ? (
+          {closedEditing ? (
+            <Panel className="fp-empty">
+              <LockKeyhole size={35} />
+              <h2>Рассмотрение закрыто</h2>
+              <p>Редактирование закончено. Все представленные сведения доступны в единой анкете.</p>
+              <button className="fp-button" onClick={() => { navigate('print'); m.setPrintSource('submitted') }}><Printer size={16} />Посмотреть анкету</button>
+            </Panel>
+          ) : protectedReviewerScreen ? (
             <Panel className="fp-empty">
               <LockKeyhole size={35} />
               <h2>Материал ещё не представлен</h2>
@@ -279,6 +298,8 @@ export default function FinancialProfile({
               {screen === 'result' && ResultScreen(m)}
               {screen === 'history' && HistoryScreen(m)}
               {screen === 'instructions' && InstructionsScreen(m)}
+              {screen === 'print' && PrintScreen(m)}
+              {screen === 'templates' && TemplatesScreen(m)}
             </>
           )}
           <footer className="fp-footer">
@@ -289,6 +310,13 @@ export default function FinancialProfile({
             <small>
               Не заменяет «Справки БК» и официальную проверку. Решение о назначении принимается вне платформы.
             </small>
+            <div className="fp-footer-contacts" aria-label="Контакты ответственных сотрудников">
+              {responsibleContacts.map((contact) => <div key={contact.email}>
+                <strong>{contact.responsibility} · {contact.name}</strong>
+                <span>{contact.phone} · {contact.email}</span>
+              </div>)}
+            </div>
+            <small>Контакты вымышлены. Технические вопросы адресуются оператору, а не являются обращением в рамках 59-ФЗ.</small>
           </footer>
         </main>
       </div>
@@ -323,13 +351,15 @@ export default function FinancialProfile({
             </div>
             {preview.name.toLowerCase().endsWith('.pdf') ? (
               <iframe className="fp-file-frame" src={preview.url} title={`Документ ${preview.name}`} />
+            ) : /\.(png|jpe?g)$/i.test(preview.name) ? (
+              <img className="fp-scan-preview" src={preview.url} alt={`Скан ${preview.name}`} />
             ) : (
               <Notice tone="neutral">
                 Для этого формата встроенный просмотр недоступен. Скачайте файл, чтобы открыть его локально.
               </Notice>
             )}
             <div className="fp-modal-actions">
-              <a className="fp-button" href={preview.url} download={preview.name}>
+              <a className="fp-button" href={preview.url} download={preview.name} onClick={() => m.recordDownload(preview.name)}>
                 <Download size={16} /> Скачать
               </a>
               <button className="fp-button fp-button-outline" onClick={() => setPreview(null)}>

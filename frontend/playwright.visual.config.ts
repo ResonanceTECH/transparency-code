@@ -11,6 +11,7 @@ export default defineConfig({
     baseURL: process.env.PROTOTYPE_URL || localUrl,
     browserName: 'chromium',
     viewport: { width: 1440, height: 1000 },
+    timezoneId: 'Europe/Moscow',
     trace: 'retain-on-failure'
   },
   snapshotPathTemplate: '{testDir}/__screenshots__/{testFilePath}/{arg}{ext}',

@@ -165,6 +165,7 @@ export default function FinancialProfileGate() {
           }
           onLogout={() => void logout()}
           onQuickLogin={() => void quickReservist()}
+          authenticated={!!user}
         />
       )}
       {!user && <div className="fp-gate fp-gate-overlay">{loginForm}</div>}

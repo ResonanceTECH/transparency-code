@@ -1,70 +1,61 @@
 import { test, expect, type Page } from '@playwright/test'
+import { nav, openPrototype, switchUser, finishRequiredFields, sendVersion } from './prototype.helpers'
 
-const users: Record<string, { username: string; display_name: string; role: string }> = {
-  reservist: { username: 'reservist', display_name: 'Алексей Ковалёв', role: 'reservist' },
-  reviewer: { username: 'reviewer', display_name: 'Анна Иванова', role: 'reviewer' }
-}
+test.beforeEach(async ({ page }) => {
+  // Меняется время сценария, но не останавливаются таймеры React и анимации.
+  await page.clock.setFixedTime(new Date('2026-11-19T09:15:00Z'))
+})
 
-async function mockAuth(page: Page) {
-  await page.route('**/api/auth/session', (route) => route.fulfill({ json: { authenticated: false, user: null } }))
-  await page.route('**/api/auth/logout', (route) => route.fulfill({ json: {} }))
-  await page.route('**/api/auth/login', (route) => {
-    const body = route.request().postDataJSON() as { username: string; password: string }
-    const user = users[body.username]
-    if (user && body.password === 'resonance-demo-2026') return route.fulfill({ json: user })
-    return route.fulfill({ status: 401, json: { detail: 'Неверный логин или пароль' } })
+async function shot(page: Page, name: string, fullPage = true) {
+  await page.evaluate(async () => {
+    await document.fonts.ready
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+    window.scrollTo(0, 0)
   })
-}
-
-async function login(page: Page, name: 'reservist' | 'reviewer') {
-  await page.getByLabel('Логин').fill(name)
-  await page.getByLabel('Пароль').fill('resonance-demo-2026')
-  await page.getByRole('button', { name: 'Войти', exact: true }).click()
-  await expect(page.locator('.fp-shell')).toBeVisible()
-}
-
-async function shot(page: Page, name: string) {
-  await page.evaluate(() => document.fonts.ready)
+  await page.mouse.move(1400, 75)
   await expect(page.locator('.fp-toast')).toHaveCount(0)
-  await expect(page).toHaveScreenshot(name, { fullPage: true })
+  await expect(page).toHaveScreenshot(name, { fullPage })
 }
 
 test('reservist screens', async ({ page }) => {
-  await mockAuth(page)
-  await page.goto('/prototype')
-  await login(page, 'reservist')
+  await openPrototype(page)
   await shot(page, 'reservist-home.png')
-  await page.getByRole('navigation').getByRole('button', { name: 'Самопроверка', exact: true }).click()
+  await nav(page, 'Самопроверка')
   await shot(page, 'reservist-selfcheck.png')
+  await nav(page, 'Документы')
+  await shot(page, 'reservist-consent-documents.png')
+  await nav(page, 'Печать анкеты')
+  await shot(page, 'reservist-print-preview.png', false)
 })
 
 test('reviewer screens', async ({ page }) => {
-  await mockAuth(page)
-  await page.goto('/prototype')
-  await login(page, 'reviewer')
+  await openPrototype(page, 'reviewer')
   await shot(page, 'reviewer-empty-queue.png')
-
-  await page.getByRole('button', { name: 'Выйти', exact: true }).click()
-  await login(page, 'reservist')
-  const nav = (name: string) => page.getByRole('navigation').getByRole('button', { name, exact: true }).click()
-  const category = (text: string) => page.locator('.fp-category-row').filter({ hasText: text }).click()
-  await nav('Выплаты и меры')
-  await category('Федеральная, региональная и муниципальная поддержка')
-  await page.getByLabel('Документ для региональной поддержки').setInputFiles({
-    name: 'demo.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4')
-  })
-  await page.getByRole('button', { name: 'Сохранить и вернуться', exact: true }).click()
-  await category('Жилищные меры')
-  await page.getByLabel('Предполагаемый год приобретения', { exact: true }).fill('2028')
-  await page.getByRole('button', { name: 'Сохранить и вернуться', exact: true }).click()
-  await nav('Самопроверка')
-  await page.getByRole('checkbox').check()
-  await page.getByRole('button', { name: 'Отправить на проверку', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Версия передана на рассмотрение' })).toBeVisible()
-
-  await page.getByRole('button', { name: 'Выйти', exact: true }).click()
-  await login(page, 'reviewer')
+  await switchUser(page, 'reservist')
+  await finishRequiredFields(page)
+  await sendVersion(page)
+  await switchUser(page, 'reviewer')
   await shot(page, 'reviewer-queue.png')
-  await page.getByRole('row').filter({ hasText: 'Ковалёв Алексей Сергеевич' }).getByRole('button', { name: /Открыть/ }).click()
+  await page.getByRole('button', { name: 'Открыть РВ-2026-0147', exact: true }).click()
   await shot(page, 'reviewer-case.png')
+  await page.getByRole('button', { name: 'Проверить читаемость и подпись', exact: true }).click()
+  await shot(page, 'reviewer-document-quality.png')
+  await nav(page, 'Карточка сигналов')
+  await shot(page, 'reviewer-signals.png')
+})
+
+test('educational templates', async ({ page }) => {
+  await openPrototype(page)
+  await nav(page, 'Шаблоны и памятки')
+  await page.locator('.fp-template-card').filter({ hasText: 'Лист описания выплаты' }).click()
+  await shot(page, 'template-payment-sheet.png')
+})
+
+test('mobile printable profile', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await openPrototype(page)
+  await page.getByRole('button', { name: 'Печать', exact: true }).click()
+  await expect(page.locator('.fp-print-document')).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  await shot(page, 'mobile-print-preview.png', false)
 })

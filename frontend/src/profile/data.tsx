@@ -14,25 +14,22 @@ import {
   LayoutDashboard,
   ListChecks,
   MessageSquareText,
+  Printer,
   ShieldCheck,
   UserRound,
   UsersRound,
   WalletCards
 } from 'lucide-react'
-import type { NavItem, Screen, CandidateDetails } from './types'
+import type { NavItem, Screen, ProfileContent } from './types'
+import samples from 'virtual:resonance-profile-sample'
 
-export const person = 'Ковалёв Алексей Сергеевич'
-export const profileId = 'РВ-2026-0147'
-export const initialCandidate: CandidateDetails = {
-  birthYear: '1987',
-  phone: '+7 (000) 000-01-47',
-  email: 'kovalev@reservist.example',
-  region: 'Липецкая область',
-  flow: 'Первый поток',
-  programYear: '2024',
-  regionalProgram: 'Герои Липецкой земли',
-  regionalProgramYear: '2025',
-  appointmentAuthority: 'ОИВ субъекта Российской Федерации'
+export const profileId = samples.profile_id
+export function createInitialContent(): ProfileContent {
+  const content = structuredClone(samples.profile) as ProfileContent
+  content.attachments = content.attachments.map((file) => ({
+    ...file, url: `/samples/${encodeURIComponent(file.name)}`
+  }))
+  return content
 }
 export const responsibleContacts = [
   {
@@ -55,16 +52,6 @@ export const profileStages = [
   [70, 'Ответы по выплатам'],
   [90, 'Записи и деятельность']
 ] as const
-export const checkCompleteness = (supportFile: string, housingYear: string, housingAnswer: string) => {
-  const support = !!supportFile
-  const housing = housingAnswer === 'Нет' || /^20\d{2}$/.test(housingYear)
-  return {
-    support,
-    housing,
-    completed: 4 + Number(support) + Number(housing),
-    missing: Number(!support) + Number(!housing)
-  }
-}
 export const reservistNav: NavItem[] = [
   { screen: 'home', title: 'Главная', icon: <LayoutDashboard size={19} /> },
   { screen: 'profile', title: 'Профиль и служба', icon: <UserRound size={19} /> },
@@ -73,15 +60,20 @@ export const reservistNav: NavItem[] = [
   { screen: 'activities', title: 'Деятельность', icon: <GraduationCap size={19} /> },
   { screen: 'documents', title: 'Документы', icon: <FolderOpen size={19} /> },
   { screen: 'selfcheck', title: 'Самопроверка', icon: <ClipboardCheck size={19} /> },
-  { screen: 'messages', title: 'Уточнения', icon: <MessageSquareText size={19} /> }
+  { screen: 'messages', title: 'Уточнения', icon: <MessageSquareText size={19} /> },
+  { screen: 'print', title: 'Печать анкеты', icon: <Printer size={19} /> },
+  { screen: 'templates', title: 'Шаблоны и памятки', icon: <BookOpen size={19} /> }
 ]
 export const reviewerNav: NavItem[] = [
   { screen: 'queue', title: 'Поступило на проверку', icon: <Inbox size={19} /> },
   { screen: 'case', title: 'Карточка резервиста', icon: <UserRound size={19} /> },
-  { screen: 'signals', title: 'Сопоставление', icon: <ListChecks size={19} /> },
+  { screen: 'documents', title: 'Документы и качество', icon: <FolderOpen size={19} /> },
+  { screen: 'signals', title: 'Карточка сигналов', icon: <ListChecks size={19} /> },
   { screen: 'messages', title: 'Запросы уточнений', icon: <MessageSquareText size={19} /> },
   { screen: 'result', title: 'Результат рассмотрения', icon: <FileCheck2 size={19} /> },
-  { screen: 'history', title: 'Версии и журнал', icon: <History size={19} /> }
+  { screen: 'history', title: 'Версии и журнал', icon: <History size={19} /> },
+  { screen: 'print', title: 'Печать анкеты', icon: <Printer size={19} /> },
+  { screen: 'templates', title: 'Шаблоны и памятки', icon: <BookOpen size={19} /> }
 ]
 export const headings: Record<Screen, [string, string]> = {
   home: ['Финансовый профиль', ''],
@@ -126,120 +118,75 @@ export const headings: Record<Screen, [string, string]> = {
     'Только назначенные вам материалы, которые резервисты отправили на рассмотрение.'
   ],
   case: ['Карточка резервиста', 'Представленная версия сведений. Личный черновик резервиста недоступен.'],
-  signals: ['Возможные несоответствия', 'Получатель → вид выплаты → основание → период → документ.'],
+  signals: ['Карточка сигналов', 'Получатель → вид выплаты → основание → период → документ. Сигнал не означает нарушения.'],
   result: ['Результат рассмотрения', 'Обоснованный статус материала фиксирует уполномоченный специалист.'],
   history: ['Версии и журнал действий', 'Представленные версии, запросы и основания изменения статуса.'],
-  instructions: ['Порядок работы с профилем', '']
+  instructions: ['Порядок работы с профилем', ''],
+  print: ['Единая печатная анкета', 'Все введённые сведения из разделов профиля в одном документе.'],
+  templates: ['Шаблоны и памятки', 'Учебные заготовки для заполнения, не официальные формы назначения выплат.']
 }
 
 export const categoryDefinitions = [
   {
     title: 'Денежное довольствие',
     note: 'Приказ о назначении на должность',
-    answer: 'Да',
     icon: <WalletCards size={19} />,
-    records: '1 запись'
   },
   {
     title: 'Надбавки и дополнительные выплаты',
     note: 'Приказ + дополнительные основания при наличии',
-    answer: 'Да',
     icon: <HandCoins size={19} />,
-    records: '1 запись'
   },
   {
     title: 'Единовременные выплаты, связанные со службой',
     note: 'Событие, дата, получатель и применимое НПА',
-    answer: 'Да',
     icon: <BadgeCheck size={19} />,
-    records: '1 запись',
     target: 'payment' as Screen
   },
   {
     title: 'Федеральная, региональная и муниципальная поддержка',
-    note: 'Федеральная: нет · региональная: да · муниципальная: нет',
-    answer: 'Да',
+    note: 'Уровень, орган назначения и обязательное основание',
     icon: <Landmark size={19} />,
-    records: '1 мера',
     target: 'support' as Screen
   },
   {
     title: 'Страховые выплаты и компенсации',
     note: 'Личные выплаты и выплаты за родственника — раздельно',
-    answer: 'Да',
     icon: <ShieldCheck size={19} />,
-    records: '1 запись',
     target: 'insurance' as Screen
   },
   {
     title: 'Пенсии и социальные выплаты',
     note: 'Ответ обязателен. Документ не требуется',
-    answer: 'Нет',
     icon: <FileCheck2 size={19} />,
-    records: 'Без вложений'
   },
   {
     title: 'Выплаты членам семьи за резервиста',
     note: 'Получатель, степень родства, ФИО и год рождения',
-    answer: 'Да',
     icon: <UsersRound size={19} />,
-    records: '1 запись'
   },
   {
     title: 'Материальная помощь организаций и фондов',
     note: 'Назначение, денежная или натуральная форма',
-    answer: 'Да',
     icon: <Building2 size={19} />,
-    records: 'Натуральная форма'
   },
   {
     title: 'Жилищные меры',
     note: 'Предполагаемый год и документ для планируемой меры',
-    answer: 'Планируется',
     icon: <Home size={19} />,
-    records: '1 мера',
     target: 'housing' as Screen
   },
   {
     title: 'Неденежные меры поддержки',
     note: 'Учитываются отдельно, в доход не включаются',
-    answer: 'Нет',
     icon: <BookOpen size={19} />,
-    records: 'Нет мер'
   }
-]
-export const documents = [
-  ['Диплом_переподготовка.pdf', 'Программа «Время героев»'],
-  ['Акт_включение_в_резерв.pdf', 'Реквизиты акта № 147-Р'],
-  ['Приказ_назначение.pdf', 'Довольствие и надбавки'],
-  ['Приказ_единовременная.pdf', 'Единовременная выплата · при наличии'],
-  ['Решение_компенсация.pdf', 'Выплата за родственника'],
-  ['Решение_члену_семьи.pdf', 'Выплата супруге за резервиста'],
-  ['Письмо_фонда.pdf', 'Материальная помощь · натуральная форма'],
-  ['Решение_жилищная_очередь.pdf', 'Планируемая жилищная мера'],
-  ['Договор_преподавание.pdf', 'Экспертная и преподавательская работа']
 ]
 export const signalDefinitions = [
   {
     code: 'РО-01',
     type: 'Получатель и основание',
     title: 'Выплата за родственника записана как личная',
-    text: 'В записи выбрано личное участие. В решении органа указана компенсация резервисту в связи с его родственником.',
-    leftTitle: 'Запись ВП-005',
-    rightTitle: 'Решение органа № К-24',
-    left: [
-      ['Получатель', 'Алексей Ковалёв'],
-      ['Сумма', '320 000 ₽'],
-      ['Основание в записи', 'За личное участие'],
-      ['Период', '01.04.2025 — 30.04.2025']
-    ],
-    right: [
-      ['Получатель', 'Алексей Ковалёв'],
-      ['Родственник', 'Сергей Ковалёв · родитель'],
-      ['Основание', 'В связи с родственником'],
-      ['Дата решения', '24.04.2025']
-    ],
-    quote: '«Назначить выплату А. С. Ковалёву в связи с участием его отца С. П. Ковалёва…»',
     action:
       'Уточнить основание и связать получателя с родственником. Не смешивать эту выплату с выплатами за личную службу.'
   },
@@ -247,22 +194,6 @@ export const signalDefinitions = [
     code: 'ДУ-01',
     type: 'Повторный учёт',
     title: 'Две записи относятся к одному назначению',
-    text: 'Совпадают получатель, сумма, плательщик и идентификатор назначения. Это возможный дубль, а не доказательство двух выплат.',
-    leftTitle: 'Надбавка · ВП-002',
-    rightTitle: 'Единовременная · ВП-003',
-    left: [
-      ['Получатель', 'Алексей Ковалёв'],
-      ['Сумма', '150 000 ₽'],
-      ['Назначение', 'Н-42'],
-      ['Дата получения', '30.08.2025']
-    ],
-    right: [
-      ['Получатель', 'Алексей Ковалёв'],
-      ['Сумма', '150 000 ₽'],
-      ['Назначение', 'Н-42'],
-      ['Дата получения', '18.09.2025']
-    ],
-    quote: '«Учебное назначение Н-42 · получатель А. С. Ковалёв · сумма 150 000 рублей».',
     action:
       'Сверить документы: было ли два самостоятельных перечисления или одна выплата ошибочно внесена в разные категории.'
   },
@@ -270,22 +201,6 @@ export const signalDefinitions = [
     code: 'ДЕ-01',
     type: 'Дополнительная деятельность',
     title: 'Период преподавания пересекается со службой',
-    text: 'Договор действует во время указанного периода военной службы. Нужно оценить основание и применимость требования об уведомлении.',
-    leftTitle: 'Период основной службы',
-    rightTitle: 'Договор № П-18/25',
-    left: [
-      ['Вид', 'Военная служба'],
-      ['Начало', '01.06.2023'],
-      ['Окончание', '31.08.2025'],
-      ['Категория', 'Старший офицерский состав']
-    ],
-    right: [
-      ['Организация', 'Учебный университет'],
-      ['Оформление', 'Гражданско-правовой договор'],
-      ['Начало', '01.04.2025'],
-      ['Окончание', '30.06.2025']
-    ],
-    quote: '«Проведение учебных занятий в период с 01.04.2025 по 30.06.2025 на основании договора П-18/25».',
     action:
       'Проверить условия договора и наличие требуемого уведомления. Само пересечение дат не устанавливает нарушение.'
   }
