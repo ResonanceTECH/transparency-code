@@ -142,4 +142,5 @@ async def seed_demo_user(db: AsyncSession) -> None:
                 )
             )
         else:
+            account.display_name = display
             account.role = role
