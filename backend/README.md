@@ -8,7 +8,7 @@
 
 > Обновлено 20.11.2026: `/prototype` подключён к постоянному хранению `app/domains/profile/`, контракт `questionnaire-v1`. Новая миграция `c72f6a904e11`, оригиналы, приватные черновики, обязательное согласие/комплектность, назначения reviewer/specialist, version-bound оценки/решения, ревизии и аудит реализованы на сервере. [Текущий контракт и миграция](../docs/reports/api-integration-2026-11-20.md), [сверка требований](../docs/reports/requirements-reconciliation-2026-11-19.md).
 
-> Проверки этой интеграции — Ruff/compileall, импорт приложения/ORM/OpenAPI, миграция сохранённой SQLite-БД и `alembic check`; клиент typecheck/build. **Тесты не запускались.** Числа тестов/сценарии в журнале ниже — исторические и не подтверждают новый контракт. Docker/PostgreSQL в этой итерации не запускались.
+> Проверки этой интеграции — Ruff/compileall, импорт приложения/ORM/OpenAPI, миграция сохранённой SQLite-БД и `alembic check`; клиент typecheck/build. Тесты запускались: `tests/test_persistent_profile_contract.py` — 7/7 под текущий контракт; весь pytest — 51 passed / 18 failed из-за устаревших ожиданий старого API. [Разбор](../docs/reports/test-run-2026-11-20.md). Числа тестов в журнале ниже — исторические. Docker/PostgreSQL в этой итерации не запускались.
 
 ## Документация
 
@@ -52,7 +52,7 @@ cp .env.example .env
 
 Перед запуском примените миграции: `.venv/bin/python -m alembic upgrade head`. Для старой БД сначала нужна резервная копия и сверка истории; не маркируйте неизвестную схему через stamp.
 
-Статические проверки: `.venv/bin/python -m ruff check app alembic` · `.venv/bin/python -m compileall -q app alembic` · `.venv/bin/python -m alembic check`. Старые тесты/CI требуют актуализации, в текущей работе не запускались.
+Статические проверки: `.venv/bin/python -m ruff check app tests alembic` · `.venv/bin/python -m compileall -q app alembic` · `.venv/bin/python -m alembic check`. Текущий контракт: `.venv/bin/python -m pytest -q tests/test_persistent_profile_contract.py` (изолированная in-memory SQLite). Старые тесты/CI требуют актуализации.
 
 ## Связь с остальным репозиторием
 
