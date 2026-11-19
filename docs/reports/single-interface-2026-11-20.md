@@ -27,6 +27,6 @@ Backend, миграция `c72f6a904e11`, контракт `questionnaire-v1`, �
 
 Локальные `/` и `/prototype` возвращают 200 и один HTML; контрольная сумма отдаваемого HTML совпадает с новой сборкой. Её JS доступен, `/api/health` отвечает `ok`, OpenAPI содержит 48 путей и `questionnaire-v1`. Это проверка доступности/статических артефактов без входа и сценарных изменений данных, не функциональный тест. ZIP сверяется с текущими исходниками и не включает `src/app/`.
 
-Тесты запускались. Для текущего API добавлен и пройден набор `backend/tests/test_persistent_profile_contract.py` — 7/7. Исторические pytest/Playwright/capture/CI сохранены, но не подтверждают новый API: 18 падений pytest и все падения Playwright связаны со старыми ожиданиями. `frontend/tests/flow.spec.ts` и e2e-workflow описывают удалённый интерфейс. [Разбор результатов](test-run-2026-11-20.md).
+Тесты запускались. Backend-тесты адаптированы под текущий API: `70 passed / 0 failed`, включая новый набор `backend/tests/test_persistent_profile_contract.py` (7/7); прежние версии сохранены в `backend/tests/archive/`. Playwright/capture/CI остаются устаревшими: все падения связаны со старыми ожиданиями in-memory UI; `frontend/tests/flow.spec.ts` и e2e-workflow описывают удалённый интерфейс. [Разбор результатов](test-run-2026-11-20.md).
 
 [Запуск](../../README.md) · [Текст для Дарьи](../../DARIA-HANDOFF.md) · [API и миграция](api-integration-2026-11-20.md).
