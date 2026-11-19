@@ -120,15 +120,11 @@ async def seed_demo_user(db: AsyncSession) -> None:
                 role=UserRole.SPECIALIST,
             )
         )
-    else:
-        # Пароль из env — источник истины для учебного контура.
-        user.password_hash = hash_password(settings.demo_password)
-        user.role = UserRole.SPECIALIST
 
     # Учебные аккаунты ролей этапа 2: резервист и проверяющий (SPEC.md §10.3).
     for username, display, role in (
-        ("reservist", "Ковалёв Алексей Сергеевич · резервист", UserRole.RESERVIST),
-        ("reviewer", "Смирнова Анна · проверяющий", UserRole.REVIEWER),
+        ("reservist", "Ковалёв Алексей Сергеевич · резервист (вым.)", UserRole.RESERVIST),
+        ("reviewer", "Смирнова Анна · проверяющий (вым.)", UserRole.REVIEWER),
     ):
         account = await get_user_by_username(db, username)
         if account is None:
@@ -141,6 +137,4 @@ async def seed_demo_user(db: AsyncSession) -> None:
                     role=role,
                 )
             )
-        else:
-            account.display_name = display
-            account.role = role
+        # Уже созданные пользователи, роли, имена и пароли при старте не изменяются.

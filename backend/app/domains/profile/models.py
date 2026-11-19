@@ -11,7 +11,18 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Date, DateTime, Enum, ForeignKey, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy import (
+    Boolean,
+    Date,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.base import Base, JSONType
@@ -75,6 +86,7 @@ class SignalStatus(str, enum.Enum):
     REVIEWED = "reviewed"  # просмотрено проверяющим
     CLARIFICATION = "clarification"  # запрошено уточнение
     DISMISSED = "dismissed"  # признано несущественным
+    INCLUDED = "included"  # включён специалистом с комментарием
 
 
 class ReviewResult(str, enum.Enum):
@@ -132,6 +144,12 @@ class Profile(Base):
     # Участие в доп. деятельности (преподавание, экспертиза…).
     activity_participates: Mapped[bool | None] = mapped_column()
 
+    # Типизированная расширенная анкета. Старые поля остаются совместимым представлением.
+    questionnaire: Mapped[dict | None] = mapped_column(JSONType)
+    revision: Mapped[int] = mapped_column(default=0, server_default="0")
+    private_reply: Mapped[str] = mapped_column(Text, default="", server_default="")
+    is_demo: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+
     status: Mapped[ProfileStatus] = mapped_column(
         Enum(ProfileStatus, native_enum=False, validate_strings=True, length=32),
         default=ProfileStatus.DRAFT,
@@ -177,6 +195,7 @@ class ServicePeriod(Base):
     end_date: Mapped[date | None] = mapped_column(Date)  # NULL — по настоящее время
     kind: Mapped[str] = mapped_column(String(64), default="military")  # military|state|other
     officer_category: Mapped[str] = mapped_column(String(64), default="")  # junior|senior|higher|volunteer
+    extra: Mapped[dict] = mapped_column(JSONType, default=dict)
     sort: Mapped[int] = mapped_column(default=0)
 
     profile: Mapped[Profile] = relationship(back_populates="service_periods")
@@ -278,6 +297,7 @@ class Activity(Base):
     period_from: Mapped[date | None] = mapped_column(Date)
     period_to: Mapped[date | None] = mapped_column(Date)
     basis_document: Mapped[str] = mapped_column(String(300), default="")  # документ-основание
+    extra: Mapped[dict] = mapped_column(JSONType, default=dict)
     sort: Mapped[int] = mapped_column(default=0)
 
     profile: Mapped[Profile] = relationship(back_populates="activities")
@@ -296,6 +316,14 @@ class ProfileDocument(Base):
     size: Mapped[int] = mapped_column(default=0)
     # diploma|reserve_act|order|contract|act|letter|other
     kind: Mapped[str] = mapped_column(String(64), default="other")
+    section: Mapped[str] = mapped_column(String(300), default="", server_default="")
+    scope: Mapped[str] = mapped_column(String(32), default="candidate", server_default="candidate")
+    active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    uploaded_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    origin: Mapped[str] = mapped_column(String(16), default="upload", server_default="upload")
+    review_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("profile_versions.id", ondelete="SET NULL")
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.current_timestamp()
     )
@@ -382,6 +410,9 @@ class ProfileMessage(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     profile_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("profiles.id", ondelete="CASCADE"), index=True)
+    version_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("profile_versions.id", ondelete="SET NULL")
+    )
     author_role: Mapped[str] = mapped_column(String(32))  # reservist|reviewer
     author_name: Mapped[str] = mapped_column(String(200), default="")
     kind: Mapped[MessageKind] = mapped_column(
@@ -411,6 +442,27 @@ class ProfileReview(Base):
     document_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("profile_documents.id", ondelete="SET NULL")
     )
+    author_name: Mapped[str] = mapped_column(String(200), default="")
+    checks: Mapped[list] = mapped_column(JSONType, default=list)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.current_timestamp()
+    )
+
+
+class ProfileDocumentAssessment(Base):
+    """Ручная оценка конкретного файла конкретной представленной версии; append-only."""
+
+    __tablename__ = "profile_document_assessments"
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    profile_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("profiles.id", ondelete="CASCADE"), index=True)
+    version_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("profile_versions.id", ondelete="CASCADE"), index=True
+    )
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("profile_documents.id", ondelete="CASCADE"), index=True
+    )
+    status: Mapped[str] = mapped_column(String(32))
+    comment: Mapped[str] = mapped_column(Text)
     author_name: Mapped[str] = mapped_column(String(200), default="")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.current_timestamp()

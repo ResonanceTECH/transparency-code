@@ -5,7 +5,8 @@ from datetime import UTC, datetime, timedelta
 from conftest import DEMO_PASSWORD
 from sqlalchemy import select
 
-from app.domains.identity.models import UserSession
+from app.domains.identity import services as identity_services
+from app.domains.identity.models import User, UserRole, UserSession
 
 PASSWORD = DEMO_PASSWORD
 
@@ -85,3 +86,42 @@ async def test_expired_session_rejected(client, demo_user, db_session):
 
     resp = await client.get("/api/auth/me")
     assert resp.status_code == 401
+
+
+async def test_demo_reservist_seed_updates_name_without_recreating_account(
+    client, db_session, monkeypatch
+):
+    settings = identity_services.get_settings().model_copy(
+        update={"allow_demo_login": True, "demo_username": "demo", "demo_password": PASSWORD}
+    )
+    monkeypatch.setattr(identity_services, "get_settings", lambda: settings)
+
+    await identity_services.seed_demo_user(db_session)
+    await db_session.commit()
+    account = await identity_services.get_user_by_username(db_session, "reservist")
+    expected_name = "Ковалёв Алексей Сергеевич · резервист (вым.)"
+    assert account is not None
+    assert account.display_name == expected_name
+    assert account.role == UserRole.RESERVIST
+    account_id, password_hash = account.id, account.password_hash
+
+    resp = await client.post(
+        "/api/auth/login", json={"username": "reservist", "password": PASSWORD}
+    )
+    assert resp.status_code == 200
+    assert resp.json()["display_name"] == expected_name
+
+    # Существующий учебный аккаунт переименовывается без потери пароля и сессии.
+    account.display_name = "Петрова Марина · резервист (вым.)"
+    await db_session.commit()
+    await identity_services.seed_demo_user(db_session)
+    await db_session.commit()
+    await db_session.refresh(account)
+
+    assert account.display_name == expected_name
+    assert account.id == account_id
+    assert account.password_hash == password_hash
+    assert len((await db_session.scalars(select(User))).all()) == 3
+    resp = await client.get("/api/auth/session")
+    assert resp.status_code == 200
+    assert resp.json()["user"]["display_name"] == expected_name

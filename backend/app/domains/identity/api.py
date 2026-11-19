@@ -4,7 +4,7 @@
 (клиент всегда парсит `response.json()`, включая logout → `{}`).
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
@@ -90,8 +90,12 @@ async def logout(
     response: Response,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    account: str | None = Header(None, alias="X-Profile-Account"),
 ) -> dict:
-    del user  # сессия уже проверена зависимостью; нужен только токен
+    if account is not None and account != user.username:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "В другой вкладке изменён аккаунт. Его сессия не закрыта"
+        )
     await services.delete_session(db, getattr(request.state, "session_token", None))
     await db.commit()
     response.delete_cookie(SESSION_COOKIE, path="/")
