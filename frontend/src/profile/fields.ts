@@ -1,4 +1,4 @@
-import type { CandidateDetails, Entity, ProfileContent, Screen } from './types'
+import type { CandidateDetails, Entity, JsonValue, ProfileContent, Screen } from './types'
 
 // Одни и те же поля используются в форме, проверке комплектности и печати.
 export type FieldSpec = {
@@ -113,7 +113,7 @@ export function paymentFields(category: number, record: Entity, content: Profile
 }
 
 export function activeRecords(content: ProfileContent, category: number): Entity[] {
-  if (!content.categoryAnswers[category] || content.categoryAnswers[category] === 'Нет' || category === 5) return []
+  if (!['Да', 'Планируется'].includes(content.categoryAnswers[category]) || category === 5) return []
   return (content.records[category] || []).filter((record) => {
     if (category === 3) return content.supportLevels[record.level] === 'Да'
     if (category === 4) return record.recipientKind === 'Резервист за родственника'
@@ -123,6 +123,48 @@ export function activeRecords(content: ProfileContent, category: number): Entity
   })
 }
 
+export function publishedContent(content: ProfileContent): ProfileContent {
+  const result = {
+    ...content,
+    records: Object.fromEntries(Array.from({ length: 10 }, (_, category) => [category, activeRecords(content, category).map((row) => {
+      const keys = new Set(['id', ...paymentFields(category, row, content).map((field) => field.key)])
+      return Object.fromEntries(Object.entries(row).filter(([key]) => keys.has(key))) as Entity
+    })])),
+    kinship: content.relativeAnswer === 'Да' ? content.kinship : { fullName: '', degree: '', status: '', receivedPayments: '' },
+    familyRecipients: content.categoryAnswers[6] === 'Да' ? content.familyRecipients : [],
+    activities: content.activityAnswer === 'Да' ? content.activities : []
+  }
+  const old = content.legacyData || {}
+  const object = (value: JsonValue | undefined): Record<string, JsonValue> => value !== null && typeof value === 'object' && !Array.isArray(value) ? value : {}
+  const included = (value: JsonValue | undefined, rows: Entity[]) => {
+    const ids = new Set(rows.map((row) => row.id))
+    return Object.fromEntries(Object.entries(object(value)).filter(([id]) => ids.has(id)))
+  }
+  result.legacyData = {
+    ...Object.fromEntries(['reserve_act_date', 'reserve_act_number', 'reserve_act_details_source'].filter((key) => key in old).map((key) => [key, old[key]])),
+    ...(content.relativeAnswer === 'Да' ? { additional_relatives: old.additional_relatives || [] } : {}),
+    service_periods: included(old.service_periods, result.servicePeriods),
+    activities: included(old.activities, result.activities),
+    records: Object.fromEntries(Object.entries(result.records).map(([category, rows]) => [category,
+      Object.fromEntries(Object.entries(included(object(old.records)[category], rows)).map(([id, value]) => {
+        const row = rows.find((item) => item.id === id)!
+        const hidden = new Set(Number(category) === 7 ? row.form === 'Денежная' ? ['description'] : ['amount']
+          : Number(category) === 8 ? content.categoryAnswers[8] === 'Планируется' ? ['housing_kind', 'decision_date', 'acquisition_date'] : ['expected_year', 'title'] : [])
+        const retained = structuredClone(object(value))
+        for (const container of ['fields', 'extra']) if (container in retained) {
+          retained[container] = Object.fromEntries(Object.entries(object(retained[container])).filter(([key]) => !hidden.has(key)))
+        }
+        const extra = object(retained.extra), embedded = extra.questionnaire_record
+        if (embedded !== null && typeof embedded === 'object' && !Array.isArray(embedded)) {
+          extra.questionnaire_record = Object.fromEntries(Object.entries(embedded).filter(([key]) => !hidden.has(key)))
+        }
+        return [id, retained]
+      }))
+    ]))
+  }
+  return result
+}
+
 export function moneyCents(value: string): number | null {
   const normalized = value.replace(/\s/g, '').replace(',', '.')
   if (!/^\d+(\.\d{1,2})?$/.test(normalized)) return null
@@ -130,8 +172,10 @@ export function moneyCents(value: string): number | null {
   const cents = Number(whole) * 100 + Number(fraction.padEnd(2, '0'))
   return Number.isSafeInteger(cents) ? cents : null
 }
-export function formatMoney(cents: number): string {
-  return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(cents / 100).replace(/\u00a0/g, ' ')
+export function formatMoney(cents: number | bigint): string {
+  const exact = BigInt(cents)
+  const fraction = String(exact % 100n).padStart(2, '0').replace(/0+$/, '')
+  return `${(exact / 100n).toLocaleString('ru-RU')}${fraction ? `,${fraction}` : ''}`.replace(/\u00a0/g, ' ')
 }
 export function dateText(value: string): string {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value.split('-').reverse().join('.') : value
@@ -141,12 +185,14 @@ export function fieldError(spec: FieldSpec, value: string, content: ProfileConte
   if (!value?.trim()) return spec.required ? `Заполните поле «${spec.label}»` : undefined
   if (spec.options && !spec.options.includes(value)) return 'Выберите значение из списка'
   if (spec.type === 'document') {
-    if (!content.attachments.some((file) => file.id === value && file.kind === 'basis')) return 'Прикрепите документ-основание'
+    const file = content.attachments.find((item) => item.id === value && item.kind === 'basis')
+    if (!file) return 'Прикрепите документ-основание'
+    if (!file.url) return 'Оригинал документа недоступен. Нужна повторная загрузка.'
   }
   if (spec.type === 'recipient' && !content.familyRecipients.some((person) => person.id === value)) return 'Добавьте и выберите получателя'
   if (spec.type === 'year' && !/^(19|20)\d{2}$/.test(value)) return 'Укажите год из четырёх цифр'
   if (spec.key === 'expectedYear' && !/^20\d{2}$/.test(value)) return 'Укажите предполагаемый год, например 2028'
-  if (spec.type === 'money' && moneyCents(value) === null) return 'Укажите неотрицательную сумму, не более двух знаков после запятой'
+  if (spec.type === 'money' && (moneyCents(value) === null || moneyCents(value)! >= 100_000_000_000_000)) return 'Укажите неотрицательную сумму меньше 1 трлн ₽, не более двух знаков после запятой'
   if (spec.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return 'Проверьте адрес электронной почты'
   if (spec.type === 'date') {
     const parsed = new Date(value + 'T00:00:00Z')
@@ -181,6 +227,10 @@ export function assessContent(content: ProfileContent) {
   const answerErrors = answers === 10 ? [] : ['Дайте ответ по всем десяти категориям выплат']
   if (Object.values(content.supportLevels).some((answer) => !['Да', 'Нет'].includes(answer))) answerErrors.push('Ответьте по каждому уровню поддержки')
   if (!['Да', 'Нет'].includes(content.personalInsuranceAnswer)) answerErrors.push('Ответьте на вопрос о личных страховых выплатах')
+  if (Object.values(content.supportLevels).every((answer) => ['Да', 'Нет'].includes(answer))
+    && content.categoryAnswers[3] !== (Object.values(content.supportLevels).includes('Да') ? 'Да' : 'Нет')) answerErrors.push('Ответ по поддержке должен соответствовать ответам по уровням')
+  if (['Да', 'Нет'].includes(content.personalInsuranceAnswer)
+    && content.categoryAnswers[4] !== (content.personalInsuranceAnswer === 'Да' || content.relativeAnswer === 'Да' && content.kinship.receivedPayments === 'Да' ? 'Да' : 'Нет')) answerErrors.push('Ответ по страховым выплатам должен соответствовать выбранным получателям')
   const categoryIssues = (category: number) => {
     if (content.categoryAnswers[category] === 'Нет' || category === 5) return []
     const rows = activeRecords(content, category)
@@ -200,11 +250,14 @@ export function assessContent(content: ProfileContent) {
     return issues
   }
   const payments = [0, 1, 2, 4, 6, 7, 9].flatMap(categoryIssues)
+  for (const file of [...content.attachments, ...(content.photo ? [content.photo] : [])]) {
+    if (!file.url) payments.push(`Недоступен оригинал приложения: ${file.name}`)
+  }
   const support = categoryIssues(3)
   const housing = categoryIssues(8)
   const activity = content.activityAnswer === 'Нет' ? [] : content.activityAnswer !== 'Да' ? ['Ответьте на вопрос о деятельности']
     : content.activities.length ? content.activities.flatMap((row) => errors(activityFields, row)) : ['Добавьте деятельность или ответьте «Нет»']
-  const consent = content.attachments.some((file) => file.id === content.consentDocumentId && file.kind === 'consent')
+  const consent = content.attachments.some((file) => file.id === content.consentDocumentId && file.kind === 'consent' && file.url)
     ? [] : ['Прикрепите подписанный скан согласия на обработку персональных данных']
   const rows: { title: string; screen: Screen; issues: string[] }[] = [
     { title: 'Личность, программа и включение в резерв', screen: 'profile', issues: [...personal, ...program] },
@@ -232,20 +285,25 @@ export function assessContent(content: ProfileContent) {
 }
 
 export function financialSummary(content: ProfileContent) {
-  let personal = 0, family = 0, personalRecords = 0
+  let personal = 0n, family = 0n, personalRecords = 0
   for (let category = 0; category < 10; category++) for (const row of activeRecords(content, category)) {
-    if ([5, 8, 9].includes(category) || row.form === 'Натуральная') continue
+    const object = (value: JsonValue | undefined): Record<string, JsonValue> => value !== null && typeof value === 'object' && !Array.isArray(value) ? value : {}
+    const retained = object(object(object(object(content.legacyData?.records)[String(category)])[row.id]).fields)
+    if ([5, 8, 9].includes(category) || row.form === 'Натуральная' || !row.form && retained.form === 'in_kind') continue
     const cents = moneyCents(row.amount || '')
     if (cents === null) continue
-    if (category === 6 || row.recipientKind === 'Член семьи') family += cents
-    else { personal += cents; personalRecords++ }
+    if (category === 6 || row.recipientKind === 'Член семьи' || !row.recipientKind && retained.recipient_kind === 'family_member') family += BigInt(cents)
+    else { personal += BigInt(cents); personalRecords++ }
   }
   return { personal: formatMoney(personal), family: formatMoney(family), personalRecords }
 }
 
 export function fieldText(spec: FieldSpec, row: Record<string, string> | CandidateDetails, content: ProfileContent): string {
   const value = (row as Record<string, string>)[spec.key] || ''
-  if (spec.type === 'document') return content.attachments.find((file) => file.id === value)?.name || (spec.required ? 'НЕ ПРИКРЕПЛЁН' : 'При наличии · не прикреплён')
+  if (spec.type === 'document') {
+    const file = content.attachments.find((item) => item.id === value)
+    return file ? `${file.name}${file.url ? '' : ' · ОРИГИНАЛ НЕДОСТУПЕН'}` : spec.required ? 'НЕ ПРИКРЕПЛЁН' : 'При наличии · не прикреплён'
+  }
   if (spec.type === 'recipient') {
     const person = content.familyRecipients.find((item) => item.id === value)
     return person ? `${person.fullName}; ${person.relation}; ${person.year} г. р.` : 'НЕ УКАЗАН'

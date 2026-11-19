@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { api } from '../app/api'
+import { api, ApiError } from '../shared/api'
 import FinancialProfile, { type PrototypeUser } from './FinancialProfile'
 import { ShieldCheck, LogIn } from 'lucide-react'
 import './financial-profile.css'
@@ -9,14 +9,14 @@ type SessionOut = { authenticated: boolean; user: PrototypeUser | null }
 const DEMO_PASSWORD = 'resonance-demo-2026'
 
 const demoAccounts: { username: string; label: string; note: string }[] = [
-  { username: 'reservist', label: 'Резервист', note: 'Петрова Марина · заполнение' },
-  { username: 'reviewer', label: 'Проверяющий', note: 'Смирнова Анна · рассмотрение' },
+  { username: 'reservist', label: 'Резервист', note: 'собственный серверный черновик' },
+  { username: 'reviewer', label: 'Проверяющий', note: 'только назначенные материалы' },
   { username: 'demo', label: 'Демо-специалист', note: 'открывает контур проверяющего' }
 ]
 
 function prototypeRole(role: string): 'reservist' | 'reviewer' | null {
   if (role === 'reservist') return 'reservist'
-  // specialist (demo) и reviewer работают в контуре проверяющего макета
+  // specialist (demo) и reviewer работают с одинаковой проверкой назначений в API.
   if (role === 'reviewer' || role === 'specialist') return 'reviewer'
   return null
 }
@@ -70,8 +70,10 @@ export default function FinancialProfileGate() {
         body: JSON.stringify({ username: loginName, password: loginPassword })
       })
       enter(nextUser)
+      return true
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось войти')
+      return false
     } finally {
       setBusy(false)
     }
@@ -84,25 +86,40 @@ export default function FinancialProfileGate() {
 
   const logout = async () => {
     try {
-      await api('/auth/logout', { method: 'POST' })
-    } catch {
-      // Локальный выход всё равно возвращает форму входа.
+      await api('/auth/logout', { method: 'POST', headers: { 'X-Profile-Account': user?.username || '' } })
+    } catch (failure) {
+      if (!(failure instanceof ApiError && failure.status === 401)) throw failure
+      // Истёкшая сессия уже закрыта; ошибка сети или иной аккаунт — не подтверждение выхода.
     }
     setUser(null)
+    setActiveRole(null)
     setUsername('')
     setPassword('')
   }
 
+  useEffect(() => {
+    if (!user) return
+    let active = true
+    const check = () => {
+      void api<SessionOut>('/auth/session').then((session) => {
+        if (!active) return
+        if (!session.authenticated || !session.user) { setUser(null); setActiveRole(null); return }
+        if (session.user.username !== user.username || session.user.role !== user.role) enter(session.user)
+      }).catch(() => { /* Сбой сети не удаляет подтверждённый профиль. Следующая операция покажет ошибку. */ })
+    }
+    window.addEventListener('focus', check)
+    return () => { active = false; window.removeEventListener('focus', check) }
+  }, [user?.username, user?.role])
+
   const quickReservist = async () => {
-    if (user) await logout()
-    await login('reservist', DEMO_PASSWORD)
+    if (!await login('reservist', DEMO_PASSWORD)) throw new Error('Переключение аккаунта не подтверждено сервером. Повторите вход при восстановлении подключения.')
   }
 
   const loginForm = (
     <div className={`fp-gate-card${activeRole ? ' fp-gate-card-overlay' : ''}`}>
       <span className="fp-gate-mark"><ShieldCheck size={30} /></span>
       <h1>Финансовый профиль резервиста</h1>
-      <p>Демонстрационный макет с ролями из API. Войдите под учебной учётной записью.</p>
+      <p>Учебный контур с серверным сохранением профилей и ролями из API.</p>
       <form onSubmit={submit}>
         <label>
           Логин
@@ -153,18 +170,13 @@ export default function FinancialProfileGate() {
 
   return (
     <>
-      {activeRole && (
+      {activeRole && user && (
         <FinancialProfile
+          key={`${user.username}:${user.role}`}
           role={activeRole}
-          user={
-            user || {
-              username: activeRole,
-              display_name: activeRole === 'reservist' ? 'Алексей Ковалёв' : 'Анна Иванова',
-              role: activeRole
-            }
-          }
-          onLogout={() => void logout()}
-          onQuickLogin={() => void quickReservist()}
+          user={user}
+           onLogout={logout}
+           onQuickLogin={quickReservist}
           authenticated={!!user}
         />
       )}

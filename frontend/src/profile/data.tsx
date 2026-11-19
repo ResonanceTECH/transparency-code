@@ -24,6 +24,19 @@ import type { NavItem, Screen, ProfileContent } from './types'
 import samples from 'virtual:resonance-profile-sample'
 
 export const profileId = samples.profile_id
+// Сценарий не является начальным состоянием аккаунта: он импортируется явно через API.
+export function createEmptyContent(): ProfileContent {
+  return {
+    candidate: { fullName: '', birthYear: '', workplace: '', workStatus: '', phone: '', email: '', reportingPeriod: '',
+      region: '', flow: '', programYear: '', regionalProgram: '', regionalProgramYear: '', appointmentAuthority: '',
+      organizer: '', diplomaDetails: '', reserveActDetails: '', diplomaDocumentId: '', reserveActDocumentId: '' },
+    servicePeriods: [], relativeAnswer: '', kinship: { fullName: '', degree: '', status: '', receivedPayments: '' },
+    familyRecipients: [], categoryAnswers: Object.fromEntries(Array.from({ length: 10 }, (_, i) => [i, ''])),
+    supportLevels: { 'Федеральный': '', 'Региональный': '', 'Муниципальный': '' }, personalInsuranceAnswer: '',
+    records: Object.fromEntries(Array.from({ length: 10 }, (_, i) => [i, []])), activityAnswer: '', activities: [],
+    attachments: [], consentDocumentId: '', photo: null, legacyData: {}
+  }
+}
 export function createInitialContent(): ProfileContent {
   const content = structuredClone(samples.profile) as ProfileContent
   content.attachments = content.attachments.map((file) => ({
@@ -61,6 +74,7 @@ export const reservistNav: NavItem[] = [
   { screen: 'documents', title: 'Документы', icon: <FolderOpen size={19} /> },
   { screen: 'selfcheck', title: 'Самопроверка', icon: <ClipboardCheck size={19} /> },
   { screen: 'messages', title: 'Уточнения', icon: <MessageSquareText size={19} /> },
+  { screen: 'history', title: 'Версии и журнал', icon: <History size={19} /> },
   { screen: 'print', title: 'Печать анкеты', icon: <Printer size={19} /> },
   { screen: 'templates', title: 'Шаблоны и памятки', icon: <BookOpen size={19} /> }
 ]

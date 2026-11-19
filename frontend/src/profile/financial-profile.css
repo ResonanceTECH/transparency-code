@@ -1,10 +1,13 @@
-.fp-shell {
+.fp-shell,
+.fp-gate {
   --fp-navy: #10283b;
   --fp-teal: #087e78;
   --fp-text: #203347;
   --fp-muted: #5e7183;
   --fp-line: #e0e7ee;
   --fp-bg: #f3f6f9;
+}
+.fp-shell {
   position: relative;
   min-height: 100vh;
   background: var(--fp-bg);
@@ -3618,7 +3621,7 @@
 }
 
 
-/* Вход в демонстрационный макет через реальные API-роли. */
+/* Общая форма входа через реальные API-роли. */
 .fp-gate {
   min-height: 100vh;
   display: grid;
@@ -3777,8 +3780,7 @@
 }
 
 
-/* Форма входа поверх уже открытого макета: состояние сценария не теряется
-   при смене пользователя. */
+/* Форма входа: модель закрытого аккаунта размонтирована, данные остаются в API. */
 .fp-gate-overlay {
   position: fixed;
   inset: 0;
@@ -3890,6 +3892,36 @@
   justify-content: flex-end;
   margin-top: 14px;
 }
+.fp-screen-content {
+  display: grid;
+  gap: 22px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font: inherit;
+}
+.fp-sync-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--fp-line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--fp-muted);
+  font-size: 12px;
+}
+.fp-sync-bar > div { display: flex; flex-wrap: wrap; gap: 14px; }
+.fp-server-error { overflow-wrap: anywhere; }
+.fp-person-labels > span { overflow-wrap: anywhere; min-width: 0; }
+.fp-version-files, .fp-legacy-details { min-width: 0; margin-top: 14px; }
+.fp-version-files summary, .fp-legacy-details summary { cursor: pointer; font-weight: 600; }
+.fp-version-files > div { margin-top: 12px; }
+.fp-legacy-details { padding: 16px; background: #fff; border: 1px solid var(--fp-line); border-radius: 8px; }
+.fp-legacy-details pre { margin: 12px 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; }
 .fp-record-list {
   display: grid;
   gap: 18px;

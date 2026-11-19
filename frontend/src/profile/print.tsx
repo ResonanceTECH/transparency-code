@@ -1,9 +1,9 @@
 import { ArrowLeft, Printer, FileText, ClipboardCheck } from 'lucide-react'
-import type { CandidateDetails, Entity, ProfileContent } from './types'
+import type { CandidateDetails, Entity, JsonValue, ProfileContent } from './types'
 import type { ProfileModel } from './model'
-import { categoryDefinitions, profileId } from './data'
+import { categoryDefinitions } from './data'
 import { activeRecords, activityFields, assessContent, fieldText, financialSummary, kinshipFields,
-  paymentFields, personalFields, programFields, recipientFields, serviceFields, type FieldSpec } from './fields'
+  paymentFields, personalFields, programFields, publishedContent, recipientFields, serviceFields, type FieldSpec } from './fields'
 import { Notice, Field } from './ui'
 import './print.css'
 
@@ -15,9 +15,33 @@ function PrintFields({ fields, values, content }: {
   </div>)}</dl>
 }
 
+export function LegacyDetails({ content, print = false }: { content: ProfileContent; print?: boolean }) {
+  const data = publishedContent(content).legacyData || {}
+  const object = (value: JsonValue | undefined): Record<string, JsonValue> => value !== null && typeof value === 'object' && !Array.isArray(value) ? value : {}
+  const rows = (value: JsonValue | undefined) => Object.fromEntries(Object.entries(object(value)).map(([id, row]) => [id,
+    Object.fromEntries(Object.entries(object(row)).filter(([key, item]) => key !== 'source_id' && (!['extra', 'fields'].includes(key) || Object.keys(object(item)).length > 0)))
+  ]).filter(([, row]) => Object.keys(row).length > 0))
+  const retained = {
+    service_periods: rows(data.service_periods), activities: rows(data.activities),
+    records: Object.fromEntries(Object.entries(object(data.records)).map(([category, value]) => [category, rows(value)]).filter(([, value]) => Object.keys(value).length > 0))
+  }
+  const additional = Array.isArray(data.additional_relatives) ? data.additional_relatives.map((relative) =>
+    Object.fromEntries(Object.entries(object(relative)).filter(([key]) => key !== 'id'))) : []
+  const sections = (['service_periods', 'records', 'activities'] as const).filter((key) => Object.keys(retained[key]).length > 0)
+  if (!data.reserve_act_date && !additional.length && !sections.length) return null
+  const Container = print ? 'section' : 'details'
+  return <Container className="fp-legacy-details">
+    {print ? <h2>Дополнительные сведения прежнего профиля</h2> : <summary>Дополнительные сохранённые сведения прежнего профиля</summary>}
+    <p>Эти реквизиты не заменяют показанные поля. Они сохранены без потери дополнительных данных старого контракта; в представленной версии относятся только к включённым в неё строкам.</p>
+    {!!data.reserve_act_date && <p><b>Отдельно сохранённая дата акта:</b> {String(data.reserve_act_date)}</p>}
+    {!!additional.length && <><h3>Дополнительные родственники из прежней анкеты</h3><pre>{JSON.stringify(additional, null, 2)}</pre></>}
+    {sections.map((key) => <div key={key}><h3>{key === 'records' ? 'Дополнительные реквизиты записей' : key === 'service_periods' ? 'Дополнительные реквизиты службы' : 'Дополнительные реквизиты деятельности'}</h3><pre>{JSON.stringify(retained[key], null, 2)}</pre></div>)}
+  </Container>
+}
+
 // Только данные переданного агрегата. Компонент не читает состояние модели, DOM форм или API.
-export function PrintableProfile({ content, version, status, draft, reply = '', createdAt = '' }: {
-  content: ProfileContent; version: number; status: string; draft: boolean; reply?: string; createdAt?: string
+export function PrintableProfile({ content, version, status, draft, reply = '', createdAt = '', profileId = 'Учебный пример' }: {
+  content: ProfileContent; version: number; status: string; draft: boolean; reply?: string; createdAt?: string; profileId?: string
 }) {
   const report = assessContent(content)
   const summary = financialSummary(content)
@@ -29,7 +53,7 @@ export function PrintableProfile({ content, version, status, draft, reply = '', 
       <p className="fp-print-disclaimer">Синтетические данные. Не является «Справкой БК», официальным заключением или решением о назначении. Печать сама по себе не передаёт сведения проверяющему.</p>
     </header>
     <section><h2>1. Личные сведения и контакты</h2>
-      {content.photo && <div className="fp-print-photo"><img src={content.photo.url} alt="Фото для карточки" /><span>Фото для карточки: {content.photo.name}</span></div>}
+      {content.photo && <div className="fp-print-photo">{content.photo.url && <img src={content.photo.url} alt="Фото для карточки" />}<span>Фото для карточки: {content.photo.name}{!content.photo.url && ' · оригинал недоступен'}</span></div>}
       <PrintFields fields={personalFields} values={content.candidate} content={content} />
     </section>
     <section><h2>2. Программа и включение в резерв</h2><PrintFields fields={programFields} values={content.candidate} content={content} /></section>
@@ -55,10 +79,11 @@ export function PrintableProfile({ content, version, status, draft, reply = '', 
     <section><h2>6. Экспертная и преподавательская деятельность</h2><p><b>Участвует:</b> {content.activityAnswer || 'НЕ УКАЗАНО'}</p>
       {content.activityAnswer === 'Да' && (content.activities.length ? content.activities.map((row, index) => <div className="fp-print-record" key={row.id}><h3>Деятельность {index + 1}</h3><PrintFields fields={activityFields} values={row} content={content} /></div>) : <p>НЕ ЗАПОЛНЕНО: деятельность не добавлена.</p>)}
     </section>
-    <section><h2>7. Приложенные документы и согласие</h2><p><b>Подписанный скан согласия на обработку ПДн:</b> {scan?.name || 'НЕ ПРИКРЕПЛЁН'}</p><p>Наличие подписи, читаемость и содержание документов требуют ручной проверки. Здесь приведён реестр; оригиналы файлов остаются отдельными приложениями.</p>
-      <table className="fp-print-table"><thead><tr><th>№</th><th>Файл</th><th>Раздел / назначение</th></tr></thead><tbody>{content.attachments.map((file, index) => <tr key={file.id}><td>{index + 1}</td><td>{file.name}</td><td>{file.section}{file.origin === 'sample' && ' · учебный пример'}</td></tr>)}</tbody></table>
+    <section><h2>7. Приложенные документы и согласие</h2><p><b>Подписанный скан согласия на обработку ПДн:</b> {scan ? `${scan.name}${scan.url ? '' : ' · ОРИГИНАЛ НЕДОСТУПЕН'}` : 'НЕ ПРИКРЕПЛЁН'}</p><p>Наличие подписи, читаемость и содержание документов требуют ручной проверки. Здесь приведён реестр; оригиналы файлов остаются отдельными приложениями.</p>
+      <table className="fp-print-table"><thead><tr><th>№</th><th>Файл</th><th>Раздел / назначение</th></tr></thead><tbody>{content.attachments.map((file, index) => <tr key={file.id}><td>{index + 1}</td><td>{file.name}{!file.url && ' · ОРИГИНАЛ НЕДОСТУПЕН'}</td><td>{file.section}{file.origin === 'sample' && ' · учебный пример'}</td></tr>)}</tbody></table>
     </section>
     {reply && <section><h2>8. Пояснение к уточнениям</h2><p className="fp-print-reply">{reply}</p></section>}
+    <LegacyDetails content={content} print />
     <section className="fp-print-completeness"><h2>Комплектность введённых сведений</h2><p>Заполнено {report.completed} из 7 обязательных блоков.</p>
       {!!report.missing && <><p><b>Анкета неполная. Перед отправкой заполните:</b></p><ul>{report.rows.filter((row) => row.issues.length).map((row) => <li key={row.title}><b>{row.title}:</b> {Array.from(new Set(row.issues)).join('; ')}</li>)}</ul></>}
       <p>Эта отметка отражает заполнение полей и наличие файлов, но не качество сканов и не итог кадровой проверки.</p>
@@ -75,11 +100,14 @@ export function PrintScreen(m: ProfileModel) {
     {m.role === 'reservist' && <Field label="Данные для печати" value={m.printSource} options={[
       { value: 'draft', label: 'Текущий личный черновик' }, ...(m.presented ? [{ value: 'submitted', label: `Представленная версия ${m.presented.version}` }] : [])
     ]} onChange={(value) => m.setPrintSource(value as 'draft' | 'submitted')} />}
+    {!m.printDraft && m.versions.length > 1 && <Field label="Представленная версия для печати" value={String(m.printedVersion?.version || '')}
+      options={m.versions.map((version) => ({ value: String(version.version), label: `Версия ${version.version} · ${version.createdAt}` }))}
+      onChange={(value) => m.setPrintVersion(Number(value))} />}
     <button className="fp-button" onClick={m.printProfile}><Printer size={16} />Печать / сохранить PDF</button>
     <Notice tone="neutral">В окне печати браузера выберите принтер или «Сохранить как PDF». Выгружается вся анкета, а не текущая вкладка.</Notice>
-  </div><PrintableProfile content={content} version={m.printDraft ? m.workingVersion : m.presented?.version || 1}
-    status={m.printDraft ? 'Не передан проверяющему' : m.profileStatus} draft={m.printDraft}
-    reply={m.printDraft ? m.privateReply : m.presented?.reply || ''} createdAt={m.printDraft ? '' : m.presented?.createdAt} />
+  </div><PrintableProfile profileId={m.profileId} content={content} version={m.printDraft ? m.workingVersion : m.printedVersion?.version || 1}
+    status={m.printDraft ? 'Не передан проверяющему' : `${m.printedVersion?.version !== m.presented?.version ? 'Историческая версия · текущий статус материала: ' : ''}${m.profileStatus}`} draft={m.printDraft}
+    reply={m.printDraft ? m.privateReply : m.printedVersion?.reply || ''} createdAt={m.printDraft ? '' : m.printedVersion?.createdAt} />
   </div>
 }
 

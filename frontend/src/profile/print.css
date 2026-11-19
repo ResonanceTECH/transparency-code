@@ -90,7 +90,9 @@
   .fp-shell .fp-template-controls { display: none !important; }
   .fp-shell .fp-workspace { width: 100%; margin: 0; }
   .fp-shell .fp-main { display: block; min-height: 0; padding: 0; gap: 0; }
-  .fp-shell .fp-main > *:not(.fp-print-page):not(.fp-template-page) { display: none !important; }
+  .fp-shell .fp-main > *:not(.fp-print-page):not(.fp-template-page):not(.fp-screen-content) { display: none !important; }
+  .fp-shell .fp-screen-content { display: block !important; min-height: 0 !important; margin: 0; padding: 0; border: 0; }
+  .fp-shell .fp-screen-content > *:not(.fp-print-page):not(.fp-template-page) { display: none !important; }
   .fp-print-page,
   .fp-template-page { display: block; }
   .fp-print-document { max-width: none; width: 100%; padding: 0; margin: 0; border: none; border-radius: 0; box-shadow: none; font-size: 10pt; }

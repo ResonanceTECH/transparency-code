@@ -2,7 +2,7 @@ import { signalDefinitions } from './data'
 import { activeRecords, dateText, moneyCents } from './fields'
 import type { Entity, ProfileContent } from './types'
 
-type ProfileSignal = typeof signalDefinitions[number] & {
+export type ProfileSignal = typeof signalDefinitions[number] & {
   index: number
   text: string
   leftTitle: string

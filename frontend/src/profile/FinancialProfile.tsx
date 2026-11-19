@@ -37,8 +37,8 @@ import {
   InstructionsScreen
 } from './screens'
 import { PrintScreen, TemplatesScreen } from './print'
-import { responsibleContacts, headings } from './data'
-import { Panel, Notice } from './ui'
+import { headings } from './data'
+import { Panel, Notice, downloadUrl } from './ui'
 import './financial-profile.css'
 
 export type PrototypeUser = { username: string; display_name: string; role: string }
@@ -52,11 +52,11 @@ export default function FinancialProfile({
 }: {
   role: 'reservist' | 'reviewer'
   user: PrototypeUser
-  onLogout: () => void
-  onQuickLogin: () => void
+   onLogout: () => void | Promise<void>
+   onQuickLogin?: () => void | Promise<void>
   authenticated?: boolean
 }) {
-  const m = useProfileModel(initialRole, authenticated ? user.display_name : '')
+  const m = useProfileModel(initialRole, authenticated ? user.display_name || user.username : '', user.username)
   const {
     role,
     screen,
@@ -74,8 +74,7 @@ export default function FinancialProfile({
     protectedReviewerScreen
   } = m
 
-  const fallbackName = role === 'reservist' ? 'Алексей Ковалёв' : 'Анна Иванова'
-  const displayName = user.display_name || fallbackName
+  const displayName = user.display_name || user.username
   const initials = displayName
     .split(/\s+/)
     .filter(Boolean)
@@ -124,7 +123,7 @@ export default function FinancialProfile({
     }
   }, [preview, setPreview, authenticated])
 
-  // Модель сохраняется между учебными аккаунтами, но данные не остаются в DOM гостя.
+  // Gate размонтирует модель при выходе/смене аккаунта. Данные живут на сервере.
   if (!authenticated) return null
 
   return (
@@ -179,7 +178,7 @@ export default function FinancialProfile({
           </button>
           <div className="fp-sidebar-contacts">
             <span>ОТВЕТСТВЕННЫЕ СОТРУДНИКИ</span>
-            {responsibleContacts.map((contact) => (
+            {m.contacts.map((contact) => (
               <div className="fp-sidebar-contact" key={contact.name}>
                 <small>{contact.responsibility}</small>
                 <strong>{contact.name}</strong>
@@ -191,7 +190,7 @@ export default function FinancialProfile({
           </div>
           <div className="fp-sidebar-version">
             <ShieldCheck size={14} />
-            Макет интерфейса · 19.11.2026
+               Серверный учебный контур · 20.11.2026
           </div>
         </div>
       </aside>
@@ -217,7 +216,7 @@ export default function FinancialProfile({
           <div className="fp-topbar-right">
             <span className="fp-demo-tag">
               <i />
-              Макет · синтетические сведения
+              Учебный контур · синтетические сведения
             </span>
             <button
               className="fp-icon-button fp-bell"
@@ -235,7 +234,7 @@ export default function FinancialProfile({
               </div>
               <ChevronDown size={14} />
             </div>
-            <button className="fp-icon-button" aria-label="Выйти" onClick={() => { m.log('Выход из учебного кабинета'); onLogout() }} title="Выйти">
+               <button className="fp-icon-button" aria-label="Выйти" disabled={m.busy || m.loading} onClick={() => m.leaveAccount(onLogout)} title="Выйти">
               <LogOut size={17} />
             </button>
           </div>
@@ -258,11 +257,22 @@ export default function FinancialProfile({
               {headings[screen][1] && <p>{headings[screen][1]}</p>}
             </div>
             {screen !== 'print' && screen !== 'templates' && <button className="fp-button fp-button-outline"
-              disabled={role === 'reviewer' && !sent} onClick={() => navigate('print')}>
+               disabled={m.loading || (role === 'reviewer' && !sent) || (role === 'reservist' && !m.profileLoaded)} onClick={() => navigate('print')}>
               <Printer size={16} />Печать
             </button>}
           </div>
-          {closedEditing ? (
+          <div className="fp-sync-bar" role="status" aria-live="polite">
+            <span>{m.loading ? 'Загружаем данные с сервера…' : m.busy ? 'Ожидаем подтверждение сервера…' : role === 'reviewer' ? 'Только назначенные представленные версии'
+              : m.saveState === 'saved' ? `Черновик сохранён на сервере${m.savedAt ? ` · ${m.savedAt}` : ''}`
+                : m.saveState === 'saving' ? 'Сохраняем черновик…' : m.saveState === 'dirty' ? 'Есть изменения, ожидающие сохранения' : 'Сохранение не подтверждено'}</span>
+            <div>{role === 'reservist' && m.editable && <button className="fp-text-button" disabled={m.busy || m.saveState === 'saving'} onClick={m.saveDraft}>Сохранить сейчас</button>}
+              <button className="fp-text-button" disabled={m.busy || m.loading} onClick={m.reloadFromServer}>Обновить с сервера</button>
+              {role === 'reservist' && m.hasUnsavedChanges && <button className="fp-text-button" onClick={m.exportDraft}>Локальная JSON-копия</button>}</div>
+          </div>
+           {m.error && <div role="alert" className="fp-server-error"><Notice tone="red"><strong>Состояние операции.</strong> {m.error}</Notice></div>}
+          {m.loading ? <Panel className="fp-empty"><ShieldCheck size={32} /><h2>Загрузка с сервера</h2><p>Читаем профиль, версии и назначенный доступ.</p></Panel>
+          : role === 'reservist' && !m.profileLoaded && screen !== 'templates' && screen !== 'instructions' ? <Panel className="fp-empty"><h2>Данные профиля не загружены</h2><p>Проверьте подключение к обновлённому API и нажмите «Обновить с сервера».</p></Panel>
+          : closedEditing ? (
             <Panel className="fp-empty">
               <LockKeyhole size={35} />
               <h2>Рассмотрение закрыто</h2>
@@ -278,7 +288,7 @@ export default function FinancialProfile({
               </p>
             </Panel>
           ) : (
-            <>
+            <fieldset className="fp-screen-content" disabled={m.busy || role === 'reservist' && !m.editable && ['profile', 'kinship', 'payments', 'category', 'payment', 'support', 'insurance', 'housing', 'activities', 'selfcheck'].includes(screen)}>
               {screen === 'home' && HomeScreen(m)}
               {screen === 'profile' && ProfileScreen(m)}
               {screen === 'kinship' && KinshipScreen(m)}
@@ -291,7 +301,7 @@ export default function FinancialProfile({
               {screen === 'activities' && ActivitiesScreen(m)}
               {screen === 'documents' && DocumentsScreen(m)}
               {screen === 'selfcheck' && SelfCheckScreen(m)}
-              {screen === 'queue' && QueueScreen(m, onQuickLogin)}
+               {screen === 'queue' && QueueScreen(m, onQuickLogin ? () => { void m.leaveAccount(onQuickLogin) } : undefined)}
               {screen === 'case' && CaseScreen(m)}
               {screen === 'signals' && SignalsScreen(m)}
               {screen === 'messages' && MessagesScreen(m)}
@@ -300,7 +310,7 @@ export default function FinancialProfile({
               {screen === 'instructions' && InstructionsScreen(m)}
               {screen === 'print' && PrintScreen(m)}
               {screen === 'templates' && TemplatesScreen(m)}
-            </>
+            </fieldset>
           )}
           <footer className="fp-footer">
             <div>
@@ -311,7 +321,7 @@ export default function FinancialProfile({
               Не заменяет «Справки БК» и официальную проверку. Решение о назначении принимается вне платформы.
             </small>
             <div className="fp-footer-contacts" aria-label="Контакты ответственных сотрудников">
-              {responsibleContacts.map((contact) => <div key={contact.email}>
+              {m.contacts.map((contact) => <div key={contact.email}>
                 <strong>{contact.responsibility} · {contact.name}</strong>
                 <span>{contact.phone} · {contact.email}</span>
               </div>)}
@@ -359,7 +369,7 @@ export default function FinancialProfile({
               </Notice>
             )}
             <div className="fp-modal-actions">
-              <a className="fp-button" href={preview.url} download={preview.name} onClick={() => m.recordDownload(preview.name)}>
+              <a className="fp-button" href={downloadUrl(preview.url)} download={preview.name} onClick={() => m.recordDownload(preview.name)}>
                 <Download size={16} /> Скачать
               </a>
               <button className="fp-button fp-button-outline" onClick={() => setPreview(null)}>

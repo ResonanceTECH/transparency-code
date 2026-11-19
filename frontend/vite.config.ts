@@ -43,7 +43,9 @@ const previewDocsFallback: Plugin = {
   configurePreviewServer(server) {
     server.middlewares.use((req, res, next) => {
       const request = req as { url?: string }
-      for (const [name, value] of Object.entries(securityHeaders)) res.setHeader(name, value)
+      if (!request.url?.startsWith('/api/')) {
+        for (const [name, value] of Object.entries(securityHeaders)) res.setHeader(name, value)
+      }
       if (request.url?.startsWith('/samples/')) {
         // Только учебные вложения разрешено показывать внутри нашего приложения.
         res.setHeader('X-Frame-Options', 'SAMEORIGIN')

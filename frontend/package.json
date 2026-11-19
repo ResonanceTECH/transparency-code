@@ -13,7 +13,7 @@
   },
   "scripts": {
     "predev": "node tools/copy-docs.mjs",
-    "dev": "vite --host 127.0.0.1",
+    "dev": "vite --host 127.0.0.1 --port 4173 --strictPort",
     "predev:prototype": "node tools/copy-docs.mjs",
     "dev:prototype": "vite --host 127.0.0.1 --port 4173 --strictPort",
     "prebuild": "node tools/copy-docs.mjs",
@@ -28,7 +28,6 @@
     "screenshots:prototype": "node tools/capture-financial-profile.mjs"
   },
   "dependencies": {
-    "@fontsource/lato": "^5.3.0",
     "lucide-react": "0.468.0",
     "react": "19.0.0",
     "react-dom": "19.0.0"

@@ -46,6 +46,7 @@ export type CandidateDetails = {
   diplomaDocumentId: string
   reserveActDocumentId: string
 }
+export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue }
 export type ProfileContent = {
   candidate: CandidateDetails
   servicePeriods: Entity[]
@@ -61,8 +62,11 @@ export type ProfileContent = {
   attachments: Attachment[]
   consentDocumentId: string
   photo: Attachment | null
+  legacyData?: Record<string, JsonValue>
 }
 export type PresentedSnapshot = ProfileContent & {
+  id: string
+  profileId: string
   version: number
   corrected: boolean
   createdAt: string

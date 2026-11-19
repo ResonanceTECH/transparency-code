@@ -9,7 +9,7 @@ export function DataFields({ m, fields, values, onChange, onUpload, uploadLabel 
   fields: FieldSpec[]
   values: Record<string, string> | CandidateDetails
   onChange: (key: string, value: string) => void
-  onUpload?: (key: string, name: string, file?: File) => void
+  onUpload?: (key: string, name: string, file?: File) => void | Promise<unknown>
   uploadLabel?: string
 }) {
   return <div className="fp-fields">

@@ -15,7 +15,6 @@ import {
   AlertCircle
 } from 'lucide-react'
 import type { Tone, CandidateDetails, Attachment } from './types'
-import { profileId } from './data'
 import { checkFile } from './documents'
 
 export function Badge({ children, tone = 'neutral' }: { children: ReactNode; tone?: Tone }) {
@@ -104,6 +103,8 @@ export function Field({
           aria-describedby={error || hint ? `${id}-help` : undefined}
           onChange={(e) => onChange?.(e.target.value)}
         >
+          {!value && <option value="" disabled>Выберите значение</option>}
+          {value && !options.some((option) => (typeof option === 'string' ? option : option.value) === value) && <option value={value}>Сохранённое значение: {value}</option>}
           {options.map((option) => (
             <option key={typeof option === 'string' ? option : option.value} value={typeof option === 'string' ? option : option.value}>
               {typeof option === 'string' ? option : option.label}
@@ -115,6 +116,7 @@ export function Field({
           id={id}
           aria-label={label}
           type={type}
+          maxLength={4000}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           aria-invalid={!!error}
@@ -152,6 +154,7 @@ export function Choice({
           aria-pressed={answer === value}
           className={answer === value ? 'active' : ''}
           onClick={() => onChange?.(answer)}
+          disabled={!onChange}
         >
           {answer === value && <Check size={14} />}
           {answer}
@@ -187,16 +190,16 @@ export function FileRow({
           {required && ' · обязательное основание'}
         </small>
       </div>
-      <Badge tone="teal">
-        <Check size={13} />
-        Добавлен
+      <Badge tone={url ? 'teal' : 'amber'}>
+        {url && <Check size={13} />}
+        {url ? 'Добавлен' : 'Оригинал недоступен'}
       </Badge>
       {onPreview && (
         <button className="fp-icon-button" aria-label={`Просмотреть ${name}`} onClick={() => onPreview(name, url)}>
           <ChevronRight size={17} />
         </button>
       )}
-      {url && <a className="fp-icon-button" aria-label={`Скачать ${name}`} href={url} download={name} onClick={() => onDownload?.(name)}>
+      {url && <a className="fp-icon-button" aria-label={`Скачать ${name}`} href={downloadUrl(url)} download={name} onClick={() => onDownload?.(name)}>
         <Download size={16} />
       </a>}
     </div>
@@ -212,7 +215,7 @@ export function UploadBox({
   label: string
   error?: boolean
   optional?: boolean
-  onUpload?: (name: string, file?: File) => void
+  onUpload?: (name: string, file?: File) => void | Promise<unknown>
   mode?: 'basis' | 'scan' | 'photo'
 }) {
   const [fileError, setFileError] = useState('')
@@ -236,7 +239,7 @@ export function UploadBox({
       </div>
       <span className="fp-button fp-button-outline">
         <Paperclip size={15} />
-        {busy ? 'Проверяем файл…' : 'Выбрать файл'}
+        {busy ? 'Проверяем и загружаем…' : 'Выбрать файл'}
       </span>
       <input
         type="file"
@@ -251,10 +254,12 @@ export function UploadBox({
           if (!file) return
           setFileError('')
           setBusy(true)
-          const problem = await checkFile(file, mode)
-          if (problem) setFileError(problem)
-          else onUpload?.(file.name, file)
-          setBusy(false)
+          try {
+            const problem = await checkFile(file, mode)
+            if (problem) setFileError(problem)
+            else await onUpload?.(file.name, file)
+          } catch (failure) { setFileError(failure instanceof Error ? failure.message : 'Загрузка не подтверждена сервером') }
+          finally { setBusy(false) }
         }}
       />
     </label>
@@ -288,7 +293,8 @@ export function PersonHeader({
   details,
   children,
   progress,
-  photo
+  photo,
+  profileId = ''
 }: {
   status: string
   tone: Tone
@@ -297,18 +303,19 @@ export function PersonHeader({
   children?: ReactNode
   progress?: number
   photo?: Attachment | null
+  profileId?: string
 }) {
   return (
     <Panel className="fp-person-header">
       <div className="fp-person-identity">
         <div className="fp-avatar fp-avatar-large">
-          {photo ? <img src={photo.url} alt={`Фото ${details.fullName}`} /> : details.fullName.split(/\s+/).slice(0, 2).map((word) => word[0]).join('')}
+          {photo?.url ? <img src={photo.url} alt={`Фото ${details.fullName}`} /> : details.fullName.split(/\s+/).slice(0, 2).map((word) => word[0]).join('')}
         </div>
         <div className="fp-person-copy">
           <div className="fp-person-labels">
             <Badge tone={tone}>{status}</Badge>
             <span>
-              {profileId} · {version}
+              {profileId && `${profileId} · `}{version}
             </span>
           </div>
           <h2>{details.fullName || 'ФИО не указано'}</h2>
@@ -354,4 +361,8 @@ export function PersonHeader({
       )}
     </Panel>
   )
+}
+
+export function downloadUrl(url: string): string {
+  return url.startsWith('/api/') ? `${url}${url.includes('?') ? '&' : '?'}download=true` : url
 }
