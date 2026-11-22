@@ -121,9 +121,9 @@ async def seed_demo_user(db: AsyncSession) -> None:
             )
         )
 
-    # Учебные аккаунты ролей этапа 2: резервист и проверяющий (SPEC.md §10.3).
+    # Учебные аккаунты ролей этапа 2: кандидат в резерв и проверяющий (SPEC.md §10.3).
     for username, display, role in (
-        ("reservist", "Ковалёв Алексей Сергеевич · резервист (вым.)", UserRole.RESERVIST),
+        ("reservist", "Ковалёв Алексей Сергеевич · кандидат в резерв (вым.)", UserRole.RESERVIST),
         ("reviewer", "Смирнова Анна · проверяющий (вым.)", UserRole.REVIEWER),
     ):
         account = await get_user_by_username(db, username)

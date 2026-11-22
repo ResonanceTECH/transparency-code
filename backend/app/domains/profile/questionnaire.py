@@ -379,7 +379,7 @@ def completeness(q: dict) -> tuple[int, list[dict], list[str]]:
             ):
                 target.append("Предполагаемый год должен быть в диапазоне 2000–2099")
             if category == 4 and row.get("recipient_kind") == "Член семьи":
-                target.append("Для страховой записи выберите резервиста либо выплату за родственника")
+                target.append("Для страховой записи выберите кандидата в резерв либо выплату за родственника")
         if category == 3:
             for level, answer in q["support_levels"].items():
                 if answer == "Да" and not any(row.get("level") == level for row in rows):

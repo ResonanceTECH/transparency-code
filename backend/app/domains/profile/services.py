@@ -712,7 +712,7 @@ async def add_message(db: AsyncSession, profile: Profile, user: User,
                          author_name=user.display_name, kind=kind, text=text, created_at=datetime.now(UTC))
     db.add(msg)
     add_audit(db, profile, user,
-              ("Вопрос проверяющего" if is_reviewer else "Ответ резервиста")
+              ("Вопрос проверяющего" if is_reviewer else "Ответ кандидата в резерв")
               + f": {text[:80]}", AuditScope.SUBMITTED)
     return msg
 

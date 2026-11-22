@@ -102,7 +102,7 @@ async def require_reservist(user: User = Depends(get_current_user),
                            account: str | None = Header(None, alias="X-Profile-Account")) -> User:
     _check_account(user, account)
     if user.role != UserRole.RESERVIST:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Доступно только резервисту")
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Доступно только кандидату в резерв")
     return user
 
 
@@ -280,7 +280,7 @@ def _messages_out(messages, profile) -> list[MessageOut]:
 
 @router.get(
     "/profile", response_model=DraftOut, tags=["profile"],
-    summary="Черновик профиля резервиста",
+    summary="Черновик профиля кандидата в резерв",
     description="Возвращает агрегированный черновик; при первом обращении создаётся пустой. "
                 "Доступен только владельцу (role=reservist).",
     responses={k: v for k, v in _ERRORS.items() if k in (401, 403)},
@@ -524,7 +524,7 @@ async def submit(data: SubmitIn | None = Body(None), user: User = Depends(requir
 @router.get(
     "/profile/signals", response_model=list[SignalOut], tags=["profile"],
     summary="Несоответствия по опубликованным версиям",
-    description="Видны резервисту после публикации — это поводы для уточнения, "
+    description="Видны кандидату в резерв после публикации — это поводы для уточнения, "
                 "а не выводы о нарушениях.",
     responses={k: v for k, v in _ERRORS.items() if k in (401, 403)},
 )
@@ -550,7 +550,7 @@ async def list_my_messages(user: User = Depends(require_reservist),
 @router.post(
     "/profile/messages", response_model=MessageOut,
     status_code=status.HTTP_201_CREATED, tags=["profile"],
-    summary="Ответ резервиста проверяющему",
+    summary="Ответ кандидата в резерв проверяющему",
     responses={k: v for k, v in _ERRORS.items() if k in (401, 403, 409)},
 )
 async def post_my_message(data: MessageIn, user: User = Depends(require_reservist),
@@ -669,7 +669,7 @@ async def owner_event(
 @router.get(
     "/profile/audit", response_model=list[AuditEventOut], tags=["profile"],
     summary="Журнал действий по профилю",
-    description="Резервист видит события обоих контуров своего профиля.",
+    description="Кандидат в резерв видит события обоих контуров своего профиля.",
     responses={k: v for k, v in _ERRORS.items() if k in (401, 403)},
 )
 async def my_audit(user: User = Depends(require_reservist),
@@ -899,7 +899,7 @@ async def _assigned_name(db: AsyncSession, profile_id: uuid.UUID) -> str:
     status_code=status.HTTP_201_CREATED, tags=["reviewer"],
     summary="Решение по профилю",
     description="accept → «Принят к рассмотрению»; clarification → «Требуется "
-                "уточнение» (комментарий уходит резервисту вопросом); "
+                "уточнение» (комментарий уходит кандидату в резерв вопросом); "
                 "complete → «Рассмотрение завершено»; remove → «Снят с "
                 "рассмотрения» (требует `basis`). Комментарий ≥ 5 символов.",
     responses={k: v for k, v in _ERRORS.items() if k in (401, 403, 404, 409, 422)},
@@ -963,7 +963,7 @@ async def reviewer_messages(profile_id: uuid.UUID,
 @router.post(
     "/reviewer/profiles/{profile_id}/messages",
     response_model=MessageOut, status_code=status.HTTP_201_CREATED,
-    tags=["reviewer"], summary="Вопрос резервисту",
+    tags=["reviewer"], summary="Вопрос кандидату в резерв",
     responses={k: v for k, v in _ERRORS.items() if k in (401, 403, 404)},
 )
 async def reviewer_post_message(profile_id: uuid.UUID, data: MessageIn,
