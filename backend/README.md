@@ -57,6 +57,8 @@ export ALLOW_DEMO_LOGIN='true'
 
 Проверка `curl http://127.0.0.1:8000/api/health`. Для существующей базы сначала резервная копия и сверка истории миграций, `alembic stamp` вслепую не применять.
 
+В примере выше `DATABASE_URL` указывает на SQLite, так backend проще поднять без сервера. При установленной PostgreSQL адрес задают как `postgresql+asyncpg://postgres@localhost:5432/resonance`, миграции и сиды отработают одинаково. Значение по умолчанию в [config.py](app/core/config.py) уже указывает на PostgreSQL.
+
 ## Переменные окружения
 
 | Переменная | Назначение | Значение по умолчанию |

@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     # Демо-логин учебного контура (синтетические данные); отключается ALLOW_DEMO_LOGIN=false.
     demo_password: str = "resonance-demo-2026"
     allow_demo_login: bool = True
+    # Дополнительные пронумерованные учебные аккаунты для автотестов (reservist1..12, reviewer1..4).
+    seed_test_users: bool = False
 
     upload_dir: str = "./uploads"
     session_ttl_hours: int = 12

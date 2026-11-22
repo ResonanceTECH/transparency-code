@@ -138,3 +138,31 @@ async def seed_demo_user(db: AsyncSession) -> None:
                 )
             )
         # Уже созданные пользователи, роли, имена и пароли при старте не изменяются.
+
+    # Пронумерованные учебные аккаунты для автотестов интерфейса: у каждого теста
+    # свой профиль, чтобы состояние на сервере не пересекалось между сценариями.
+    if settings.seed_test_users:
+        for index in range(1, 13):
+            username = f"reservist{index}"
+            if await get_user_by_username(db, username) is None:
+                db.add(
+                    User(
+                        id=uuid.uuid4(),
+                        username=username,
+                        password_hash=hash_password(settings.demo_password),
+                        display_name=f"Учебный кандидат в резерв {index} (вым.)",
+                        role=UserRole.RESERVIST,
+                    )
+                )
+        for index in range(1, 5):
+            username = f"reviewer{index}"
+            if await get_user_by_username(db, username) is None:
+                db.add(
+                    User(
+                        id=uuid.uuid4(),
+                        username=username,
+                        password_hash=hash_password(settings.demo_password),
+                        display_name=f"Учебный проверяющий {index} (вым.)",
+                        role=UserRole.REVIEWER,
+                    )
+                )
