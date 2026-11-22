@@ -4,6 +4,8 @@
 
 **Рабочий прототип** [http://135.106.155.218](http://135.106.155.218) · описание API [http://135.106.155.218/docs/](http://135.106.155.218/docs/)
 
+**Запасной адрес** работает в VPN [trycloudflare.com](https://hindu-continues-amsterdam-ozone.trycloudflare.com/prototype)
+
 **Репозиторий** [github.com/ResonanceTECH/transparency-code](https://github.com/ResonanceTECH/transparency-code)
 
 **Видеодемонстрация** [drive.google.com](https://drive.google.com/drive/folders/1ZDhu66H5ODiLK5ClZtLpsWyNeRU80lzT?usp=sharing)
