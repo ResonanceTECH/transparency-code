@@ -1,15 +1,19 @@
 # Резонанс · Backend
 
-Серверная часть прототипа «Резонанс» — API для интеграционного интерфейса клиента (`frontend/`, маршрут `/`). Обслуживает дела проверок: документы, извлечённые поля, детерминированный анализ, сигналы, решения специалиста и отчёт.
+Серверная часть прототипа «Резонанс» — API для единственного финансового профиля на `/` (`/prototype` — та же версия). Backend прежних дел/документного анализа сохранён вместе с данными; его старый frontend удалён, серверный код при очистке UI не менялся.
 
 **Стек:** Python 3.12+ · FastAPI · PostgreSQL · SQLAlchemy 2.x (async) · Alembic · Pydantic v2 · pytest.
 
 > Только синтетические данные. Сервер не принимает юридически значимых решений и не обращается к внешним реестрам, банкам или ИИ-сервисам.
 
+> Обновлено 20.11.2026: `/prototype` подключён к постоянному хранению `app/domains/profile/`, контракт `questionnaire-v1`. Новая миграция `c72f6a904e11`, оригиналы, приватные черновики, обязательное согласие/комплектность, назначения reviewer/specialist, version-bound оценки/решения, ревизии и аудит реализованы на сервере. [Текущий контракт и миграция](../docs/reports/api-integration-2026-11-20.md), [сверка требований](../docs/reports/requirements-reconciliation-2026-11-19.md).
+
+> Проверки этой интеграции — Ruff/compileall, импорт приложения/ORM/OpenAPI, миграция сохранённой SQLite-БД и `alembic check`; клиент typecheck/build. Backend-тесты адаптированы под текущий контракт и проходят полностью: **70 passed / 0 failed**, включая `tests/test_persistent_profile_contract.py` (7/7). Прежние `test_auth.py`/`test_profile.py` сохранены в `tests/archive/*.py.txt`. [Разбор](../docs/reports/test-run-2026-11-20.md). Docker/PostgreSQL в этой итерации не запускались.
+
 ## Документация
 
 - **[SPEC.md](SPEC.md)** — полная спецификация: REST-контракт (16 эндпоинтов `/api/*` + `/api/health` + `/openapi.json`), модель данных PostgreSQL, бизнес-логика (статусы, `stale`-снапшоты, конвейер документов, движок правил, решения), безопасность, env-конфигурация, детальный домен этапа 2 (финансовый профиль резервиста — по продуктовым документам команды) и открытые вопросы.
-- Клиентский контракт этапа 1 восстановлен из `frontend/src/app/` и `frontend/tests/flow.spec.ts` — клиент является источником истины. Контракт этапа 2 (SPEC §10) — из `frontend/src/profile/` и документов «Проект ролей и функций», «Роли и функции + ввод данных», «Интерфейс», «Паспорт проекта».
+- Исторический контракт этапа 1 восстанавливался из уже удалённого `frontend/src/app/` и сохранённого `frontend/tests/flow.spec.ts`; это не текущий интерфейс. Новый профильный контракт — [questionnaire-v1](../docs/reports/api-integration-2026-11-20.md), `frontend/src/profile/` и предоставленные документы ролей/ввода данных.
 
 ## Структура
 
@@ -29,6 +33,7 @@ backend/
       documents/        #   загрузка, pipeline, факты, demo-комплекты
       analysis/         #   rules/, analysis_runs, signals, decisions
       reporting/        #   сборка отчёта (без собственных таблиц)
+      profile/          #   серверный профиль, версии, очередь, решения и назначения
   MICROSERVICES.md      # карта сервисов, контракты, путь выделения
   alembic/              # миграции (env.py готов; revisions — после поднятия PostgreSQL)
   tests/                # pytest + httpx AsyncClient
@@ -45,16 +50,18 @@ cp .env.example .env
 .venv/bin/python -m uvicorn app.main:app --reload --port 8000
 ```
 
-Проверки: `.venv/bin/python -m pytest` · `.venv/bin/ruff check app tests`.
+Перед запуском примените миграции: `.venv/bin/python -m alembic upgrade head`. Для старой БД сначала нужна резервная копия и сверка истории; не маркируйте неизвестную схему через stamp.
+
+Статические проверки: `.venv/bin/python -m ruff check app tests alembic` · `.venv/bin/python -m compileall -q app alembic` · `.venv/bin/python -m alembic check`. Текущий контракт: `.venv/bin/python -m pytest -q tests/test_persistent_profile_contract.py` (изолированная in-memory SQLite). Старые тесты/CI требуют актуализации.
 
 ## Связь с остальным репозиторием
 
 - `frontend/` — клиент; dev-прокси `/api` и `/openapi.json` → `http://127.0.0.1:8000` уже настроен (`frontend/vite.config.ts`).
 - `frontend/nginx.conf` — production-прокси на `backend:8000`; `client_max_body_size 6m` рассчитан на файлы ≤ 5 МБ.
-- `docs/` — продуктовые отчёты; `ml/` — резерв под ML-часть.
-- Корневой `docker-compose.yml` (когда появится) — сервисы `db` (postgres), `backend`, `frontend`.
+- `docs/` — актуальные отчёты и учебные примеры PDF.
+- Корневой `docker-compose.yml` — сервисы `db` (postgres), `backend`, `frontend`; миграции применяются при старте backend.
 
-## Журнал итераций
+## Исторический журнал итераций до текущей API-интеграции
 
 ### Итерация 1 — спецификация (16.11.2026)
 
@@ -82,7 +89,7 @@ cp .env.example .env
 - `tests/test_models.py`: smoke-граф на `sqlite+aiosqlite` (create_all → user→case→doc→fact→run→signal→decision → selectinload-выборка). Dev-зависимость `aiosqlite`.
 - Проверено: `pytest` 3/3, `ruff check` чист, `Base.metadata.tables` — все 10 таблиц.
 
-<|open|>argument key="new_string" type="string"<|sep|>### Итерация 4 — микросервисная декомпозиция: bounded contexts (17.11.2026)
+### Итерация 4 — микросервисная декомпозиция: bounded contexts (17.11.2026)
 
 - `app/` перестроен из плоской структуры в доменные модули: `core/` (shared kernel: config, db, deps, base), `platform/` (health), `domains/{identity,cases,documents,analysis,reporting}` — каждый с `api.py`/`schemas.py`/`services.py`/`models.py` по единому шаблону.
 - ORM-модели распределены по доменам-владельцам: `identity` → users/sessions; `cases` → cases/case_events; `documents` → documents/facts; `analysis` → analysis_runs/signals/signal_facts/decisions; enum'ы переехали в `models.py` своих доменов. Старые `app/models`, `app/api`, `app/schemas`, `app/services`, `app/rules`, `app/repositories` удалены.
@@ -184,6 +191,15 @@ cp .env.example .env
 - Проверено: `ruff` чист, `pytest` **58/58**; `/openapi.json` — 35 путей, все 19 эндпоинтов §10.7 (`profile`/`reviewer`/`reference`), `IncomeSummaryOut` в схемах.
 
 **Контракт этапа 2 (SPEC §10) реализован полностью.** Открытый фронт работ — итерация 10: подключение `frontend/src/profile` к API (сейчас макет в памяти).
+
+### Итерация 11 — завершение функционального контура этапа 2 (17.11.2026)
+
+- Синхронизированы исправления из более новой копии: `GET /api/auth/session`, `rub()` для пустых `sum()`, `from_attributes` для вложенных DTO, структурный diff версий (`profile/diff.py`), эндпоинты `GET /profile/versions/{n}/diff/{m}`, `GET /reviewer/profiles/{id}?version=`, `GET /reviewer/profiles/{id}/versions`, `GET /reviewer/profiles/{id}/diff`.
+- Клиент: сравнение версий у резервиста и проверяющего, переключение версии, выделенный блок «Причина уточнения», печатная форма «Сведения о доходах» (`window.print()`), локальные шрифты Lato без внешних запросов.
+- Исправлена проблема портативности: `now()` заменён на `CURRENT_TIMESTAMP` в моделях и миграциях — локальный запуск на SQLite больше не падает при сиде демо-аккаунтов.
+- Исправлена гонка параллельных boot-запросов: ленивое создание профиля сериализуется локальной блокировкой и фиксируется в БД; добавлен регрессионный тест.
+- CSP дополнен `font-src 'self' data:` в nginx и preview; добавлен локальный fallback `/docs → /docs/` для `vite preview`.
+- Проверено: `pytest` **61/61**, `ruff` чист, `tsc` чист, `vite build` OK, Playwright **8/8** макета и **5/5** интеграционного сценария.
 
 ### Итерация 10 — frontend `ProfileApp` + фикс сериализации reviewer-карточки (17.11.2026)
 

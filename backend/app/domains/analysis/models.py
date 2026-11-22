@@ -39,7 +39,7 @@ class AnalysisRun(Base):
     warnings: Mapped[list] = mapped_column(JSONType, default=list)
     author: Mapped[str] = mapped_column(String(64), default="")
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), index=True
+        DateTime(timezone=True), server_default=func.current_timestamp(), index=True
     )
 
     case: Mapped["Case"] = relationship(back_populates="runs")
@@ -64,7 +64,9 @@ class Signal(Base):
         index=True,
     )
     sort: Mapped[int] = mapped_column(Integer, default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.current_timestamp()
+    )
 
     run: Mapped[AnalysisRun] = relationship(back_populates="signals")
     case: Mapped["Case"] = relationship()
@@ -110,6 +112,8 @@ class Decision(Base):
     )
     comment: Mapped[str] = mapped_column(Text)
     author: Mapped[str] = mapped_column(String(64), default="")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.current_timestamp()
+    )
 
     signal: Mapped[Signal] = relationship(back_populates="decisions")

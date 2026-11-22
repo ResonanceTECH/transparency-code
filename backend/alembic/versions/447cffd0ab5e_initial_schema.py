@@ -25,7 +25,7 @@ def upgrade() -> None:
     sa.Column('password_hash', sa.String(length=255), nullable=False),
     sa.Column('display_name', sa.String(length=200), nullable=False),
     sa.Column('role', sa.Enum('SPECIALIST', 'RESERVIST', 'REVIEWER', name='userrole', native_enum=False, length=32), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_users'))
     )
     op.create_index(op.f('ix_users_username'), 'users', ['username'], unique=True)
@@ -37,8 +37,8 @@ def upgrade() -> None:
     sa.Column('department', sa.String(length=200), nullable=False),
     sa.Column('basis', sa.Enum('CANDIDATE', 'EXPENSE_REVIEW', name='basis', native_enum=False, length=32), nullable=False),
     sa.Column('year', sa.Integer(), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
     sa.ForeignKeyConstraint(['owner_id'], ['users.id'], name=op.f('fk_cases_owner_id_users')),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_cases'))
     )
@@ -48,7 +48,7 @@ def upgrade() -> None:
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('token', sa.String(length=64), nullable=False),
     sa.Column('user_id', sa.Uuid(), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
     sa.Column('expires_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('last_seen_at', sa.DateTime(timezone=True), nullable=True),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], name=op.f('fk_sessions_user_id_users'), ondelete='CASCADE'),
@@ -65,7 +65,7 @@ def upgrade() -> None:
     sa.Column('input_hash', sa.String(length=64), nullable=False),
     sa.Column('warnings', sa.JSON().with_variant(postgresql.JSONB(astext_type=sa.Text()), 'postgresql'), nullable=False),
     sa.Column('author', sa.String(length=64), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
     sa.ForeignKeyConstraint(['case_id'], ['cases.id'], name=op.f('fk_analysis_runs_case_id_cases'), ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_analysis_runs'))
     )
@@ -76,7 +76,7 @@ def upgrade() -> None:
     sa.Column('case_id', sa.Uuid(), nullable=False),
     sa.Column('message', sa.Text(), nullable=False),
     sa.Column('author', sa.String(length=64), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
     sa.ForeignKeyConstraint(['case_id'], ['cases.id'], name=op.f('fk_case_events_case_id_cases'), ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_case_events'))
     )
@@ -92,7 +92,7 @@ def upgrade() -> None:
     sa.Column('status', sa.Enum('RECEIVED', 'PROCESSING', 'READY', 'FAILED', name='documentstatus', native_enum=False, length=16), nullable=False),
     sa.Column('error', sa.Text(), nullable=True),
     sa.Column('downloadable', sa.Boolean(), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
     sa.ForeignKeyConstraint(['case_id'], ['cases.id'], name=op.f('fk_documents_case_id_cases'), ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_documents'))
     )
@@ -110,8 +110,8 @@ def upgrade() -> None:
     sa.Column('unit', sa.String(length=30), nullable=False),
     sa.Column('snippet', sa.Text(), nullable=False),
     sa.Column('confirmed', sa.Boolean(), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
     sa.ForeignKeyConstraint(['case_id'], ['cases.id'], name=op.f('fk_facts_case_id_cases'), ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['document_id'], ['documents.id'], name=op.f('fk_facts_document_id_documents'), ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_facts'))
@@ -128,7 +128,7 @@ def upgrade() -> None:
     sa.Column('action', sa.Text(), nullable=False),
     sa.Column('status', sa.Enum('UNREVIEWED', 'CLARIFICATION', 'RESOLVED', 'FURTHER_REVIEW', name='signalstatus', native_enum=False, length=24), nullable=False),
     sa.Column('sort', sa.Integer(), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
     sa.ForeignKeyConstraint(['case_id'], ['cases.id'], name=op.f('fk_signals_case_id_cases'), ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['run_id'], ['analysis_runs.id'], name=op.f('fk_signals_run_id_analysis_runs'), ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_signals'))
@@ -143,7 +143,7 @@ def upgrade() -> None:
     sa.Column('status', sa.Enum('CLARIFICATION', 'RESOLVED', 'FURTHER_REVIEW', name='decisionstatus', native_enum=False, length=24), nullable=False),
     sa.Column('comment', sa.Text(), nullable=False),
     sa.Column('author', sa.String(length=64), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
     sa.ForeignKeyConstraint(['signal_id'], ['signals.id'], name=op.f('fk_decisions_signal_id_signals'), ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_decisions'))
     )

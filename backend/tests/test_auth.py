@@ -5,7 +5,8 @@ from datetime import UTC, datetime, timedelta
 from conftest import DEMO_PASSWORD
 from sqlalchemy import select
 
-from app.domains.identity.models import UserSession
+from app.domains.identity import services as identity_services
+from app.domains.identity.models import User, UserRole, UserSession
 
 PASSWORD = DEMO_PASSWORD
 
@@ -85,3 +86,56 @@ async def test_expired_session_rejected(client, demo_user, db_session):
 
     resp = await client.get("/api/auth/me")
     assert resp.status_code == 401
+
+
+async def test_demo_seed_preserves_existing_accounts(client, db_session, monkeypatch):
+    """Сид создаёт только отсутствующие аккаунты и не перезаписывает существующие."""
+    settings = identity_services.get_settings().model_copy(
+        update={"allow_demo_login": True, "demo_username": "demo", "demo_password": PASSWORD}
+    )
+    monkeypatch.setattr(identity_services, "get_settings", lambda: settings)
+
+    await identity_services.seed_demo_user(db_session)
+    await db_session.commit()
+    account = await identity_services.get_user_by_username(db_session, "reservist")
+    assert account is not None
+    assert account.role == UserRole.RESERVIST
+    account_id, password_hash = account.id, account.password_hash
+    assert len((await db_session.scalars(select(User))).all()) == 3
+
+    # Пользователь мог изменить имя — повторный сид не должен его возвращать.
+    account.display_name = "Петрова Марина · резервист (вым.)"
+    await db_session.commit()
+    await identity_services.seed_demo_user(db_session)
+    await db_session.commit()
+    await db_session.refresh(account)
+
+    assert account.display_name == "Петрова Марина · резервист (вым.)"
+    assert account.id == account_id
+    assert account.password_hash == password_hash
+    assert len((await db_session.scalars(select(User))).all()) == 3
+    resp = await client.post("/api/auth/login", json={"username": "reservist", "password": PASSWORD})
+    assert resp.status_code == 200
+    assert resp.json()["display_name"] == "Петрова Марина · резервист (вым.)"
+
+
+async def test_demo_seed_creates_only_missing_accounts(db_session, monkeypatch):
+    settings = identity_services.get_settings().model_copy(
+        update={"allow_demo_login": True, "demo_username": "demo", "demo_password": PASSWORD}
+    )
+    monkeypatch.setattr(identity_services, "get_settings", lambda: settings)
+
+    await identity_services.seed_demo_user(db_session)
+    await db_session.commit()
+    usernames = {user.username for user in (await db_session.scalars(select(User))).all()}
+    assert usernames == {"demo", "reservist", "reviewer"}
+
+    # Удаление одного аккаунта и повторный сид восстанавливает только его.
+    await db_session.delete(await identity_services.get_user_by_username(db_session, "reviewer"))
+    await db_session.commit()
+    await identity_services.seed_demo_user(db_session)
+    await db_session.commit()
+    restored = await identity_services.get_user_by_username(db_session, "reviewer")
+    assert restored is not None
+    assert restored.role == UserRole.REVIEWER
+    assert len((await db_session.scalars(select(User))).all()) == 3

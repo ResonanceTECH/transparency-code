@@ -33,9 +33,11 @@ class Case(Base):
     department: Mapped[str] = mapped_column(String(200), default="")
     basis: Mapped[Basis] = mapped_column(Enum(Basis, native_enum=False, validate_strings=True, length=32))
     year: Mapped[int] = mapped_column(Integer)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.current_timestamp()
+    )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+        DateTime(timezone=True), server_default=func.current_timestamp(), onupdate=func.current_timestamp()
     )
 
     owner: Mapped["User"] = relationship(back_populates="cases")
@@ -58,6 +60,8 @@ class CaseEvent(Base):
     case_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("cases.id", ondelete="CASCADE"), index=True)
     message: Mapped[str] = mapped_column(Text)
     author: Mapped[str] = mapped_column(String(64), default="")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.current_timestamp()
+    )
 
     case: Mapped[Case] = relationship(back_populates="events")

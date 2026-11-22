@@ -9,7 +9,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.domains.profile.models import (
     MessageKind,
@@ -22,6 +22,7 @@ from app.domains.profile.models import (
     SignalStatus,
     WorkStatus,
 )
+from app.domains.profile.questionnaire import Questionnaire
 
 # ---------- Входные схемы черновика (PUT /api/profile — полная замена) ----------
 
@@ -43,13 +44,16 @@ class ProgramIn(BaseModel):
 
 
 class ServicePeriodIn(BaseModel):
+    id: uuid.UUID | None = None
     start_date: date | None = None
     end_date: date | None = None
     kind: str = "military"
     officer_category: str = ""
+    extra: dict = Field(default_factory=dict)
 
 
 class KinshipRelativeIn(BaseModel):
+    id: uuid.UUID | None = None
     full_name: str = ""
     degree: str = ""
     participant_status: ParticipantStatus | None = None
@@ -62,6 +66,7 @@ class KinshipIn(BaseModel):
 
 
 class PaymentRecordIn(BaseModel):
+    id: uuid.UUID | None = None
     recipient_kind: RecipientKind | None = None
     recipient_name: str = ""
     recipient_birth_year: int | None = Field(default=None, ge=1900, le=2100)
@@ -89,12 +94,14 @@ class PaymentBlockIn(BaseModel):
 
 
 class ActivityIn(BaseModel):
+    id: uuid.UUID | None = None
     organization: str = ""
     kind: str = ""
     engagement: str = ""
     period_from: date | None = None
     period_to: date | None = None
     basis_document: str = ""
+    extra: dict = Field(default_factory=dict)
 
 
 class DraftIn(BaseModel):
@@ -111,6 +118,16 @@ class DraftIn(BaseModel):
     payments: list[PaymentBlockIn] = []
     activity_participates: bool | None = None
     activities: list[ActivityIn] = []
+    questionnaire: Questionnaire | None = None
+    revision: int | None = Field(default=None, ge=0)
+    private_reply: str | None = Field(default=None, max_length=4000)
+
+    @field_validator("payments")
+    @classmethod
+    def unique_categories(cls, value: list[PaymentBlockIn]) -> list[PaymentBlockIn]:
+        if len({block.category for block in value}) != len(value):
+            raise ValueError("Категория выплат повторяется в черновике")
+        return value
 
 
 # ---------- Выходные схемы черновика ----------
@@ -148,11 +165,17 @@ class ActivityOut(ActivityIn):
 
 
 class DocumentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     filename: str
     size: int
     kind: str
     created_at: datetime
+    section: str = ""
+    origin: Literal["upload", "sample"] = "upload"
+    url: str = ""
+    profile_revision: int = 0
+    version_number: int | None = None
 
 
 class DraftOut(BaseModel):
@@ -176,6 +199,13 @@ class DraftOut(BaseModel):
     documents: list[DocumentOut]
     versions_total: int
     updated_at: datetime
+    questionnaire: Questionnaire
+    contract_version: Literal["questionnaire-v1"] = "questionnaire-v1"
+    revision: int = 0
+    private_reply: str = ""
+    is_demo: bool = False
+    editable: bool = True
+    can_load_demo: bool = False
 
 
 class MilestoneOut(BaseModel):
@@ -201,6 +231,19 @@ class VersionOut(BaseModel):
 
 class VersionDetailOut(VersionOut):
     snapshot: dict
+    profile_revision: int = 0
+
+
+class SubmitIn(BaseModel):
+    confirmed: bool = False
+    revision: int | None = Field(default=None, ge=0)
+
+
+class SampleDocumentIn(BaseModel):
+    name: str = Field(min_length=1, max_length=300)
+    section: str = Field(default="Учебный пример", max_length=300)
+    kind: Literal["basis", "consent"] = "basis"
+    revision: int = Field(ge=0)
 
 
 class DiffEntryOut(BaseModel):
@@ -234,6 +277,11 @@ class QueueItemOut(BaseModel):
     submitted_at: datetime | None
     pending_signals: int
     reviewer_name: str  # назначенный проверяющий
+    version_number: int = 1
+    region: str = ""
+    reporting_period: str = ""
+    program_year: str = ""
+    is_demo: bool = False
 
 
 class SignalOut(BaseModel):
@@ -245,14 +293,27 @@ class SignalOut(BaseModel):
     payload: dict
     status: SignalStatus
     created_at: datetime
+    version_id: uuid.UUID | None = None
+    version_number: int = 0
+    decisions: list["SignalDecisionOut"] = Field(default_factory=list)
 
 
 class SignalDecisionIn(BaseModel):
-    status: Literal["reviewed", "clarification", "dismissed"]
+    status: Literal["reviewed", "clarification", "dismissed", "included"]
     comment: str = Field(min_length=5, max_length=2000)
+    version: int = Field(ge=1)
+    request_clarification: bool = False
+
+    @field_validator("comment")
+    @classmethod
+    def meaningful_comment(cls, value: str) -> str:
+        if len(value.strip()) < 5:
+            raise ValueError("Комментарий должен содержать не менее пяти символов")
+        return value.strip()
 
 
 class SignalDecisionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     status: SignalStatus
     comment: str
@@ -263,11 +324,60 @@ class SignalDecisionOut(BaseModel):
 class ReviewDecisionIn(BaseModel):
     action: Literal["accept", "clarification", "complete", "remove"]
     comment: str = Field(min_length=5, max_length=4000)
-    basis: str = ""  # основание — обязательно для remove
+    basis: str = Field(default="", max_length=4000)
+    document_id: uuid.UUID | None = None
+    checks: list[bool] = Field(default_factory=list, max_length=3)
+    version: int = Field(ge=1)
+
+    @field_validator("comment")
+    @classmethod
+    def meaningful_comment(cls, value: str) -> str:
+        if len(value.strip()) < 5:
+            raise ValueError("Комментарий должен содержать не менее пяти символов")
+        return value.strip()
+
+
+class DocumentAssessmentIn(BaseModel):
+    version: int = Field(ge=1)
+    status: Literal["usable", "details", "unreadable"]
+    comment: str = Field(min_length=5, max_length=4000)
+    request_clarification: bool = False
+
+    @field_validator("comment")
+    @classmethod
+    def meaningful_comment(cls, value: str) -> str:
+        if len(value.strip()) < 5:
+            raise ValueError("Комментарий должен содержать не менее пяти символов")
+        return value.strip()
+
+
+class DocumentAssessmentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    document_id: uuid.UUID
+    version_id: uuid.UUID
+    version_number: int
+    status: Literal["usable", "details", "unreadable"]
+    comment: str
+    author_name: str
+    created_at: datetime
+
+
+class ClientEventIn(BaseModel):
+    event: Literal["view", "print", "template", "selfcheck", "open", "close"]
+    screen: str = Field(default="", max_length=64)
+    version: int | None = Field(default=None, ge=1)
 
 
 class MessageIn(BaseModel):
     text: str = Field(min_length=1, max_length=4000)
+
+    @field_validator("text")
+    @classmethod
+    def nonempty_message(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Сообщение не должно состоять только из пробелов")
+        return value.strip()
 
 
 class MessageOut(BaseModel):
@@ -279,14 +389,17 @@ class MessageOut(BaseModel):
     kind: MessageKind
     text: str
     created_at: datetime
+    version_number: int | None = None
 
 
 class AuditEventOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     actor_name: str
     actor_role: str
     action: str
     created_at: datetime
+    scope: Literal["private", "submitted"]
 
 
 class ContactOut(BaseModel):
@@ -309,6 +422,8 @@ class IncomeSummaryOut(BaseModel):
     currency: str = "RUB"
     total: str
     records: int
+    family_total: str = "0.00"
+    family_records: int = 0
     by_category: list[IncomeCategoryTotal]
 
 
@@ -318,6 +433,7 @@ class ReviewerProfileOut(BaseModel):
     profile_id: uuid.UUID
     full_name: str
     status: ProfileStatus
+    revision: int
     version: VersionDetailOut
     signals: list[SignalOut]
     pending_signals: int
@@ -325,6 +441,10 @@ class ReviewerProfileOut(BaseModel):
     reviews: list["ReviewOut"]
     assigned_reviewer: str
     income_summary: IncomeSummaryOut
+    document_assessments: list[DocumentAssessmentOut] = Field(default_factory=list)
+    contract_version: Literal["questionnaire-v1"] = "questionnaire-v1"
+    is_demo: bool = False
+    result_documents: list[DocumentOut] = Field(default_factory=list)
 
 
 class ReviewOut(BaseModel):
@@ -336,6 +456,16 @@ class ReviewOut(BaseModel):
     comment: str
     author_name: str
     created_at: datetime
+    document_id: uuid.UUID | None = None
+    version_id: uuid.UUID | None = None
+    checks: list[bool] = Field(default_factory=list)
+
+
+class ReviewStateOut(BaseModel):
+    reviews: list[ReviewOut]
+    document_assessments: list[DocumentAssessmentOut]
+    result_documents: list[DocumentOut]
 
 
 ReviewerProfileOut.model_rebuild()
+SignalOut.model_rebuild()

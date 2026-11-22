@@ -36,7 +36,9 @@ class Document(Base):
     )
     error: Mapped[str | None] = mapped_column(Text)
     downloadable: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.current_timestamp()
+    )
 
     case: Mapped["Case"] = relationship(back_populates="documents")
     facts: Mapped[list["Fact"]] = relationship(back_populates="document")
@@ -60,9 +62,11 @@ class Fact(Base):
     unit: Mapped[str] = mapped_column(String(30), default="")
     snippet: Mapped[str] = mapped_column(Text, default="")
     confirmed: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.current_timestamp()
+    )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+        DateTime(timezone=True), server_default=func.current_timestamp(), onupdate=func.current_timestamp()
     )
 
     case: Mapped["Case"] = relationship(back_populates="facts")
