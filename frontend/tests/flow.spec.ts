@@ -46,6 +46,22 @@ test('profile: reservist publishes draft, reviewer requests clarification', asyn
   await page.getByLabel('Пароль').fill('resonance-demo-2026')
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
   await expect(page.getByText('ФИНАНСОВЫЙ ПРОФИЛЬ')).toBeVisible()
+  // Профиль живёт между прогонами: если он на рассмотрении (поля заблокированы),
+  // проверяющий сначала возвращает его в «уточнение» — цикл восстанавливается.
+  if (!(await page.getByRole('button', { name: 'Сохранить черновик' }).isVisible())) {
+    await page.getByRole('button', { name: 'Выйти' }).click()
+    await page.getByLabel('Логин').fill('reviewer')
+    await page.getByLabel('Пароль').fill('resonance-demo-2026')
+    await page.getByRole('button', { name: 'Войти', exact: true }).click()
+    await page.getByText('Е2Е Тестовая Кандидатка').click()
+    await page.getByLabel('Комментарий (обязателен, ≥ 5 символов)').fill('Продолжаем проверку: требуется уточнение')
+    await page.getByRole('button', { name: 'Требуются уточнения' }).click()
+    await page.getByRole('button', { name: 'Выйти' }).click()
+    await page.getByLabel('Логин').fill('reservist')
+    await page.getByLabel('Пароль').fill('resonance-demo-2026')
+    await page.getByRole('button', { name: 'Войти', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Сохранить черновик' })).toBeVisible()
+  }
   // Анкета и поток (веха 10%) — селекторы привязаны к панели: у родственника тоже есть «ФИО»
   const anketa = page.locator('section.panel', { hasText: 'Анкета и поток' })
   await anketa.getByLabel('ФИО').fill('Е2Е Тестовая Кандидатка')
@@ -100,7 +116,7 @@ test('profile: reservist publishes draft, reviewer requests clarification', asyn
   // Решение: уточнение — резервист получает вопрос
   await page.getByLabel('Комментарий (обязателен, ≥ 5 символов)').fill('Уточните записи о выплатах родственникам')
   await page.getByRole('button', { name: 'Требуются уточнения' }).click()
-  await expect(page.getByText('ТРЕБУЕТСЯ УТОЧНЕНИЕ')).toBeVisible()
+  await expect(page.getByText('ТРЕБУЕТСЯ УТОЧНЕНИЕ').first()).toBeVisible()
   // Резервист видит вопрос и статус
   await page.getByRole('button', { name: 'Выйти' }).click()
   await page.getByLabel('Логин').fill('reservist')
