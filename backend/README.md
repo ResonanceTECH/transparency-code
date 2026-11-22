@@ -144,7 +144,18 @@ cp .env.example .env
 - `tests/test_profile.py` — 18 контракт-тестов: ролевые границы (401/403), вехи прогресса, полная замена черновика, публикация + слепки версий, невидимость черновика, жизненный цикл несоответствий и решений, переписка, аудит по scope, дедуп документов, экспорт.
 - **Проверено:** `ruff` чист, `pytest` **55/55**; живой E2E через curl: reservist → черновик 90% → submit v1 → сигнал `kinship-payments-missing` → clarification → вопрос резервисту → правка → resubmit v2 → complete → аудит; docker-стек пересобран, миграция применена, контур работает через nginx `:8080`; `/openapi.json` — 33 пути, теги `profile`/`reviewer`/`reference`, 64 схемы.
 
-**Далее (итерация 9):** подключение `frontend/src/profile` (`/prototype`) к API — сейчас экран полностью в памяти; UI-правки из «Интерфейс» (круглая шкала прогресса, «несоответствия», контакты операторов из `reference_contacts`).
+### Итерация 9 — клиент профиля: API-backed контуры резервиста и проверяющего (17.11.2026)
+
+- `frontend/src/app/profile.tsx` — рабочее пространство этапа 2 в основном приложении (`/`): после входа пользователь с `role=reservist|reviewer` получает свой контур вместо делопроизводства (`specialist` — прежний UI).
+- **Резервист**: черновик-форма (анкета, поток, акт, периоды службы, родство СВО, 10 категорий выплат с записями, доп. деятельность), панель вех 10–90% с `missing[]`, загрузка/удаление документов по виду, «Представить сведения», версии, несоответствия, переписка, справочник операторов. Редактирование заблокировано вне `draft`/`clarification`.
+- **Проверяющий**: очередь с фильтром по статусу и счётчиком несоответствий; карточка — слепок версии, несоответствия с решениями (комментарий ≥5), решение по профилю (accept/clarification/complete/remove + `basis`), переписка, выгрузка JSON.
+- `UserOut` расширен: `display_name`, `role` (login/me) — клиент выбирает контур по роли; `model.ts`/`App.tsx`/`views.tsx` обновлены.
+- **Найден и исправлен UX-баг**: загрузка документа/ответ в переписке перезагружала черновик и затирала несохранённые правки — теперь точечное обновление коллекций.
+- `/prototype` (`src/profile/`) оставлен дизайн-макетом — его покрывают 8 тестов `profile.spec.ts`.
+- **Тесты**: `tests/flow.spec.ts` +1 e2e — двухролевой сценарий через nginx: reservist → черновик 90% → submit → reviewer очередь → несоответствие → clarification → вопрос резервисту. Playwright **5/5** + **8/8** prototype, `tsc` чист.
+- **Инфра**: `HTTP_PORT=8080` зафиксирован в `.env`; пароль Postgres приведён в соответствие с `.env` после пересоздания db.
+
+**Итого после этапа 2:** backend 55 тестов + frontend 13 e2e; Swagger — 34 пути (`/api/profile*`, `/api/reviewer*`, `/api/reference/*` с русскими summary).
 
 ### Итерация 7 — SPEC v1.2 + documents-домен (17.11.2026)
 
@@ -163,3 +174,24 @@ cp .env.example .env
 - Проверено: `ruff` чист, `pytest` **27/27**, OpenAPI — 10 путей, все новые эндпоинты с тегом `documents`; uvicorn + живой PostgreSQL E2E: login → case `PR-2025-0012` → upload `up.json` → `ready`+2 факта → PATCH → `confirm-facts` → download 200 → лента событий полная.
 
 **Далее:** `POST /cases/{id}/demo` (trade_in/apartment/clean) → analysis (rules + runs + signals) → decisions → report.
+
+### Итерация 9 — SPEC §10.8: финансовая сводка проверяющего (17.11.2026)
+
+- `profile/services.py`: `income_summary(snapshot)` — агрегат «Сведения о доходах» над слепком `ProfileVersion.snapshot` (иммутабелен, совпадает с показанной версией): суммируются только записи `form="monetary"`; категория `non_monetary` и форма `in_kind` исключены; `Decimal`-арифметика, итог `{currency:"RUB", total, records, by_category[]}`.
+- `profile/schemas.py`: `IncomeSummaryOut` + `IncomeCategoryTotal`; поле `income_summary` добавлено в `ReviewerProfileOut` — сводка видна только проверяющему в карточке профиля.
+- `profile/api.py`: `GET /reviewer/profiles/{id}` заполняет `income_summary` из `version.snapshot`.
+- `tests/test_profile.py`: `test_reviewer_income_summary` — черновик с monetary/in_kind/non_monetary записями → submit → проверка итога `200000.00`, `records=3`, разбивка по категориям; in_kind (999) и non_monetary (777) не входят.
+- Проверено: `ruff` чист, `pytest` **58/58**; `/openapi.json` — 35 путей, все 19 эндпоинтов §10.7 (`profile`/`reviewer`/`reference`), `IncomeSummaryOut` в схемах.
+
+**Контракт этапа 2 (SPEC §10) реализован полностью.** Открытый фронт работ — итерация 10: подключение `frontend/src/profile` к API (сейчас макет в памяти).
+
+### Итерация 10 — frontend `ProfileApp` + фикс сериализации reviewer-карточки (17.11.2026)
+
+**Контекст:** `src/app/profile.tsx` (`ProfileApp`) уже был подключён к API параллельной работой — App.tsx роутит `reservist`/`reviewer` в него после логина; `/prototype` остаётся in-memory макетом (его держат `tests/profile.spec.ts`).
+
+- **Багфикс backend:** `GET /api/reviewer/profiles/{id}` отдавал **500** на профилях с перепиской/решениями — api.py конструировал `ReviewerProfileOut` напрямую из ORM-объектов `ProfileMessage`/`ProfileReview`, а вложенные `MessageOut`/`ReviewOut` не имели `from_attributes` (тесты проходили, т.к. списки были пусты). Fix: `model_config = ConfigDict(from_attributes=True)` в `MessageOut` и `ReviewOut`. Проверено на живом API: 200, messages/reviews/income_summary на месте.
+- **Frontend `src/app/profile.tsx`:**
+  - `ReviewerView` — панель «Сведения о доходах» (SPEC §10.8): итог + разбивка по категориям из `income_summary`; панель «Журнал рассмотрения» (`GET …/audit`, submitted-scope).
+  - `ReservistView` — поле «Форма» (monetary/in_kind) в редакторе записей выплат (без него `income_summary` из UI всегда 0); панель «Журнал действий» (`GET /profile/audit`).
+  - Типы: `IncomeSummary`, `AuditEvent`, `income_summary` в `ReviewerProfile`.
+- Проверено: `tsc --noEmit` чист, `vite build` OK; backend `ruff` чист, `pytest` **58/58**; живой E2E: reviewer login → queue → карточка completed-профиля → 200 + `income_summary`. Браузерный e2e (Playwright + vite :5173 → backend :8000): reservist — workspace/полнота/версии/контакты/аудит/документы; reviewer — очередь → карточка → «Сведения о доходах»/слепок/решения/аудит/export — 15/15 проверок.

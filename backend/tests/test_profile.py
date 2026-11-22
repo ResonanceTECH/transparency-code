@@ -463,3 +463,94 @@ async def test_version_immutable_snapshot(reservist_client, reviewer_client):
     assert v1["snapshot"]["person"]["phone"] == "+7 900 111-22-33"  # слепок не изменился
     assert v2["snapshot"]["person"]["phone"] == "+7 900 999-88-77"
     assert v2["status"] == "resubmitted"
+
+
+async def _two_versions(reservist_client, reviewer_client) -> str:
+    """Публикует v1, проверяющий просит уточнение, резервист правит и
+    представляет v2. Возвращает profile_id."""
+    await _fill_and_submit(reservist_client)
+    pid = (await reviewer_client.get("/api/reviewer/queue")).json()[0]["profile_id"]
+    r = await reviewer_client.post(
+        f"/api/reviewer/profiles/{pid}/decision",
+        json={"action": "clarification", "comment": "Уточните данные о службе"})
+    assert r.status_code == 201
+    draft = _full_draft()
+    draft["person"]["phone"] = "+7 900 999-88-77"
+    draft["payments"][0] = {
+        "category": "one_time", "answer": "yes",
+        "records": [{"title": "Единовременная выплата", "basis": "Указ Президента № 1",
+                     "form": "monetary", "amount": "10000.00",
+                     "period_from": "2025-05-01"}],
+    }
+    r = await reservist_client.put("/api/profile", json=draft)
+    assert r.status_code == 200
+    r = await reservist_client.post("/api/profile/submit")
+    assert r.json()["number"] == 2
+    return pid
+
+
+async def test_version_diff_reservist(reservist_client, reviewer_client):
+    await _two_versions(reservist_client, reviewer_client)
+    r = await reservist_client.get("/api/profile/versions/1/diff/2")
+    assert r.status_code == 200
+    body = r.json()
+    assert (body["version_from"], body["version_to"]) == (1, 2)
+    paths = {e["path"] for e in body["entries"]}
+    assert "person.phone" in paths
+    assert "payments[0].answer" in paths
+    phone = next(e for e in body["entries"] if e["path"] == "person.phone")
+    assert phone["before"] == "+7 900 111-22-33"
+    assert phone["after"] == "+7 900 999-88-77"
+    # технические id не попадают в diff
+    assert all(not p.endswith(".id") for p in paths)
+    assert body["changed"] == len(body["entries"])
+
+
+async def test_version_diff_reviewer_and_version_param(reservist_client,
+                                                       reviewer_client):
+    pid = await _two_versions(reservist_client, reviewer_client)
+    versions = (await reviewer_client.get(
+        f"/api/reviewer/profiles/{pid}/versions")).json()
+    assert [v["number"] for v in versions] == [1, 2]
+
+    r = await reviewer_client.get(f"/api/reviewer/profiles/{pid}/diff")
+    assert r.status_code == 200
+    assert r.json()["version_from"] == 1 and r.json()["version_to"] == 2
+    assert r.json()["changed"] > 0
+
+    # выбор версии в карточке
+    card = (await reviewer_client.get(
+        f"/api/reviewer/profiles/{pid}?version=1")).json()
+    assert card["version"]["number"] == 1
+    assert card["version"]["snapshot"]["person"]["phone"] == "+7 900 111-22-33"
+    r = await reviewer_client.get(f"/api/reviewer/profiles/{pid}?version=99")
+    assert r.status_code == 404
+
+
+async def test_diff_requires_two_versions(reservist_client, reviewer_client):
+    await _fill_and_submit(reservist_client)
+    pid = (await reviewer_client.get("/api/reviewer/queue")).json()[0]["profile_id"]
+    r = await reviewer_client.get(f"/api/reviewer/profiles/{pid}/diff")
+    assert r.status_code == 409
+    r = await reservist_client.get("/api/profile/versions/1/diff/7")
+    assert r.status_code == 404
+
+
+# ---------- unit: структурный diff ----------
+
+
+def test_diff_snapshots_unit():
+    from app.domains.profile.diff import diff_snapshots
+
+    assert diff_snapshots({"a": 1}, {"a": 1}) == []
+    entries = diff_snapshots(
+        {"a": 1, "b": {"c": "x"}, "l": [1, 2]},
+        {"a": 1, "b": {"c": "y"}, "l": [1, 2, 3], "new": True},
+    )
+    paths = {e["path"] for e in entries}
+    assert paths == {"b.c", "l[2]", "new"}
+    by_path = {e["path"]: e for e in entries}
+    assert by_path["l[2]"]["before"] is None and by_path["l[2]"]["after"] == 3
+    # вложенные id игнорируются
+    assert diff_snapshots({"r": {"id": "1", "v": 5}},
+                          {"r": {"id": "2", "v": 5}}) == []

@@ -25,6 +25,7 @@ from app.core.schemas import ErrorOut
 from app.domains.identity.deps import get_current_user
 from app.domains.identity.models import User, UserRole
 from app.domains.profile import services as svc
+from app.domains.profile.diff import diff_snapshots
 from app.domains.profile.models import (
     AuditScope,
     ProfileDocument,
@@ -50,6 +51,7 @@ from app.domains.profile.schemas import (
     SignalDecisionOut,
     SignalOut,
     VersionDetailOut,
+    VersionDiffOut,
     VersionOut,
 )
 
@@ -317,6 +319,28 @@ async def get_version(number: int, user: User = Depends(require_reservist),
                             created_at=version.created_at, snapshot=version.snapshot)
 
 
+@router.get(
+    "/profile/versions/{number}/diff/{other}",
+    response_model=VersionDiffOut, tags=["profile"],
+    summary="Сравнение двух версий («что изменилось»)",
+    description="Структурный diff снапшотов: изменённые поля, добавленные и "
+                "удалённые элементы списков. Технические ключи (id, метки "
+                "времени) из сравнения исключены.",
+    responses={k: v for k, v in _ERRORS.items() if k in (401, 403, 404)},
+)
+async def diff_versions(number: int, other: int,
+                        user: User = Depends(require_reservist),
+                        db: AsyncSession = Depends(get_db)):
+    profile = await svc.get_or_create_profile(db, user)
+    by_number = {v.number: v for v in profile.versions}
+    base, target = by_number.get(number), by_number.get(other)
+    if base is None or target is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Версия не найдена")
+    entries = diff_snapshots(base.snapshot, target.snapshot)
+    return VersionDiffOut(version_from=number, version_to=other,
+                          changed=len(entries), entries=entries)
+
+
 @router.post(
     "/profile/submit", response_model=VersionOut,
     status_code=status.HTTP_201_CREATED, tags=["profile"],
@@ -429,15 +453,22 @@ async def _get_visible(db: AsyncSession, profile_id: uuid.UUID):
 @router.get(
     "/reviewer/profiles/{profile_id}", response_model=ReviewerProfileOut,
     tags=["reviewer"], summary="Карточка профиля для проверяющего",
-    description="Последняя опубликованная версия (слепок), несоответствия, "
-                "переписка и решения. Черновики сюда не попадают — 404.",
+    description="Опубликованная версия-слепок (последняя или заданная "
+                "параметром `version`), несоответствия, переписка и решения. "
+                "Черновики сюда не попадают — 404.",
     responses={k: v for k, v in _ERRORS.items() if k in (401, 403, 404)},
 )
 async def reviewer_profile(profile_id: uuid.UUID,
+                           version: int | None = Query(None),
                            user: User = Depends(require_reviewer),
                            db: AsyncSession = Depends(get_db)):
     profile = await _get_visible(db, profile_id)
-    version = profile.versions[-1]
+    if version is None:
+        version = profile.versions[-1]
+    else:
+        version = next((v for v in profile.versions if v.number == version), None)
+        if version is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Версия не найдена")
     signals = await svc.profile_signals(db, profile.id, version.id)
     messages = await svc.profile_messages(db, profile.id)
     reviews = await svc.profile_reviews(db, profile.id)
@@ -456,6 +487,42 @@ async def reviewer_profile(profile_id: uuid.UUID,
         assigned_reviewer=reviewer,
         income_summary=IncomeSummaryOut(**svc.income_summary(version.snapshot)),
     )
+
+
+@router.get(
+    "/reviewer/profiles/{profile_id}/versions",
+    response_model=list[VersionOut], tags=["reviewer"],
+    summary="Все опубликованные версии профиля",
+    responses={k: v for k, v in _ERRORS.items() if k in (401, 403, 404)},
+)
+async def reviewer_versions(profile_id: uuid.UUID,
+                            user: User = Depends(require_reviewer),
+                            db: AsyncSession = Depends(get_db)):
+    profile = await _get_visible(db, profile_id)
+    return [VersionOut(id=v.id, number=v.number, status=v.status,
+                       progress=v.progress, created_at=v.created_at)
+            for v in profile.versions]
+
+
+@router.get(
+    "/reviewer/profiles/{profile_id}/diff",
+    response_model=VersionDiffOut, tags=["reviewer"],
+    summary="Изменения между двумя последними версиями",
+    description="Структурный diff снапшотов последней и предпоследней "
+                "версий — «что изменилось» при повторном представлении.",
+    responses={k: v for k, v in _ERRORS.items() if k in (401, 403, 404, 409)},
+)
+async def reviewer_diff(profile_id: uuid.UUID,
+                        user: User = Depends(require_reviewer),
+                        db: AsyncSession = Depends(get_db)):
+    profile = await _get_visible(db, profile_id)
+    if len(profile.versions) < 2:
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            "Для сравнения нужны минимум две версии")
+    base, target = profile.versions[-2], profile.versions[-1]
+    entries = diff_snapshots(base.snapshot, target.snapshot)
+    return VersionDiffOut(version_from=base.number, version_to=target.number,
+                          changed=len(entries), entries=entries)
 
 
 async def _assigned_name(db: AsyncSession, profile_id: uuid.UUID) -> str:

@@ -46,8 +46,11 @@ def num(value: Any) -> Decimal | None:
         return None
 
 
-def rub(amount: Decimal) -> str:
+def rub(amount: Decimal | int) -> str:
     """«1 450 000 ₽» — сумма для человекочитаемого объяснения."""
+    # Пустой `sum(...)` — int 0; форматтер не должен падать на таком входе.
+    if not isinstance(amount, Decimal):
+        amount = Decimal(amount)
     quantized = amount.quantize(Decimal("1")) if amount == amount.to_integral() else amount.normalize()
     return f"{quantized:,}".replace(",", " ") + " ₽"
 
