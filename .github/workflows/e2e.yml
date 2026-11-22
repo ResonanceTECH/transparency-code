@@ -1,11 +1,19 @@
 name: e2e
 
-# Автозапуск отключён: flow.spec.ts описывает интерфейс, удалённый при переходе
-# на единый UI финансового профиля (DARIA-HANDOFF.md — адаптация UI-сценариев
-# отдельным этапом). Оставлен ручной запуск; вернуть триггеры push/PR после
-# переписывания тестов под актуальные экраны.
 on:
-  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - 'backend/**'
+      - 'docker-compose.yml'
+      - '.github/workflows/e2e.yml'
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - 'backend/**'
+      - 'docker-compose.yml'
+      - '.github/workflows/e2e.yml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
