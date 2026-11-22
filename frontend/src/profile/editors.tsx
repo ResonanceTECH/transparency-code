@@ -1,7 +1,7 @@
 import { Plus, Trash2 } from 'lucide-react'
 import type { CandidateDetails, Entity } from './types'
 import type { ProfileModel } from './model'
-import { activeRecords, fieldError, paymentFields, type FieldSpec } from './fields'
+import { activeRecords, fieldError, optionLabel, paymentFields, type FieldSpec } from './fields'
 import { Field, FileRow, UploadBox } from './ui'
 
 export function DataFields({ m, fields, values, onChange, onUpload, uploadLabel }: {
@@ -31,7 +31,7 @@ export function DataFields({ m, fields, values, onChange, onUpload, uploadLabel 
       }
       const options = spec.type === 'recipient'
         ? [{ value: '', label: 'Выберите получателя' }, ...m.familyRecipients.map((person) => ({ value: person.id, label: `${person.fullName || 'Новый получатель'} · ${person.relation || 'связь не указана'}` }))]
-        : spec.options
+        : spec.options?.map((opt) => ({ value: opt, label: optionLabel(opt) }))
       return <Field key={spec.key} label={spec.label} value={value} options={options}
         type={spec.type === 'date' || spec.type === 'email' || spec.type === 'tel' ? spec.type : 'text'}
         required={spec.required} optional={!spec.required} wide={spec.wide} error={error} hint={spec.hint}

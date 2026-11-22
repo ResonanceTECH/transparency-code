@@ -298,6 +298,14 @@ export function financialSummary(content: ProfileContent) {
   return { personal: formatMoney(personal), family: formatMoney(family), personalRecords }
 }
 
+const OPTION_LABELS: Record<string, string> = {
+  'Сам резервист': 'Сам кандидат в резерв',
+  'Резервист за родственника': 'Кандидат в резерв за родственника'
+}
+export function optionLabel(value: string): string {
+  return OPTION_LABELS[value] || value
+}
+
 export function fieldText(spec: FieldSpec, row: Record<string, string> | CandidateDetails, content: ProfileContent): string {
   const value = (row as Record<string, string>)[spec.key] || ''
   if (spec.type === 'document') {
@@ -309,5 +317,5 @@ export function fieldText(spec: FieldSpec, row: Record<string, string> | Candida
     return person ? `${person.fullName}; ${person.relation}; ${person.year} г. р.` : 'НЕ УКАЗАН'
   }
   if (!value) return spec.required ? 'НЕ ЗАПОЛНЕНО' : spec.type === 'date' ? 'Не указано / период продолжается' : 'Не указано (необязательно)'
-  return spec.type === 'date' ? dateText(value) : value
+  return spec.type === 'date' ? dateText(value) : optionLabel(value)
 }

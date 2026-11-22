@@ -3,7 +3,7 @@ import type { CandidateDetails, Entity, JsonValue, ProfileContent } from './type
 import type { ProfileModel } from './model'
 import { categoryDefinitions } from './data'
 import { activeRecords, activityFields, assessContent, fieldText, financialSummary, kinshipFields,
-  paymentFields, personalFields, programFields, publishedContent, recipientFields, serviceFields, type FieldSpec } from './fields'
+  optionLabel, paymentFields, personalFields, programFields, publishedContent, recipientFields, serviceFields, type FieldSpec } from './fields'
 import { Notice, Field } from './ui'
 import './print.css'
 
@@ -62,7 +62,7 @@ export function PrintableProfile({ content, version, status, draft, reply = '', 
     </section>
     <section><h2>4. Родство и получатели</h2><p><b>Является родственником участника СВО:</b> {content.relativeAnswer || 'НЕ УКАЗАНО'}</p>
       {content.relativeAnswer === 'Да' && <><PrintFields fields={kinshipFields} values={content.kinship} content={content} /><p><b>Получал выплаты в связи с этим родством:</b> {content.kinship.receivedPayments || 'НЕ УКАЗАНО'}</p></>}
-      <h3>Получатели — члены семьи за резервиста</h3><p><b>Были такие выплаты:</b> {content.categoryAnswers[6] || 'НЕ УКАЗАНО'}</p>
+      <h3>Получатели — члены семьи за кандидата в резерв</h3><p><b>Были такие выплаты:</b> {content.categoryAnswers[6] || 'НЕ УКАЗАНО'}</p>
       {content.categoryAnswers[6] === 'Да' && (content.familyRecipients.length ? content.familyRecipients.map((row, index) => <div className="fp-print-record" key={row.id}><h3>Получатель {index + 1}</h3><PrintFields fields={recipientFields} values={row} content={content} /></div>) : <p>НЕ ЗАПОЛНЕНО: получатели не добавлены.</p>)}
     </section>
     <section><h2>5. Выплаты и меры поддержки</h2>
@@ -73,7 +73,7 @@ export function PrintableProfile({ content, version, status, draft, reply = '', 
         {index === 5 ? <p>Документ не требуется; ответ «Да / Нет» достаточен.</p> : content.categoryAnswers[index] === 'Нет' ? <p>Дополнительные сведения не требуются.</p> :
           activeRecords(content, index).length ? activeRecords(content, index).map((row, rowIndex) => <div className="fp-print-record" key={row.id}><h4>Запись {rowIndex + 1}</h4><PrintFields fields={paymentFields(index, row, content)} values={row} content={content} /></div>) : <p>НЕ ЗАПОЛНЕНО: записи не добавлены.</p>}
       </section>)}
-      <div className="fp-print-summary"><p><b>Сумма денежных записей резервиста:</b> {summary.personal} ₽ ({summary.personalRecords} записей).</p><p><b>Отдельно: выплаты членам семьи:</b> {summary.family} ₽.</p>
+      <div className="fp-print-summary"><p><b>Сумма денежных записей кандидата в резерв:</b> {summary.personal} ₽ ({summary.personalRecords} записей).</p><p><b>Отдельно: выплаты членам семьи:</b> {summary.family} ₽.</p>
         <p>Суммы приведены из анкеты без подтверждения подлинности. Возможные дубли автоматически не вычитаются. Натуральные, неденежные и жилищные меры не прибавляются к этим суммам.</p></div>
     </section>
     <section><h2>6. Экспертная и преподавательская деятельность</h2><p><b>Участвует:</b> {content.activityAnswer || 'НЕ УКАЗАНО'}</p>
@@ -117,7 +117,7 @@ const templates = [
   { id: 'scan', title: 'Памятка по качеству скана', description: 'Что проверить до загрузки и что затем оценивает кадровый специалист.', icon: ClipboardCheck }
 ]
 function BlankFields({ fields }: { fields: FieldSpec[] }) {
-  return <dl className="fp-print-fields">{fields.map((field) => <div key={field.key}><dt>{field.label}{field.required && ' *'}{field.options && ` (${field.options.join(' / ')})`}</dt><dd>________________________________________________</dd></div>)}</dl>
+  return <dl className="fp-print-fields">{fields.map((field) => <div key={field.key}><dt>{field.label}{field.required && ' *'}{field.options && ` (${field.options.map(optionLabel).join(' / ')})`}</dt><dd>________________________________________________</dd></div>)}</dl>
 }
 const blankContent: ProfileContent = {
   candidate: {} as CandidateDetails, servicePeriods: [], relativeAnswer: '', kinship: { fullName: '', degree: '', status: '', receivedPayments: '' },
@@ -134,7 +134,7 @@ export function TemplatesScreen(m: ProfileModel) {
     {template.id === 'profile' ? <>
       <section><h2>1. Личные сведения и программа</h2><BlankFields fields={[...personalFields, ...programFields]} /></section>
       <section><h2>2. Служба и работа</h2><BlankFields fields={serviceFields} /><p>Для нескольких периодов добавьте отдельные листы.</p></section>
-      <section><h2>3. Родство и получатели</h2><p>Являетесь родственником участника СВО? ☐ Да ☐ Нет. Получали выплаты в связи с родством? ☐ Да ☐ Нет.</p><BlankFields fields={kinshipFields} /><h3>Получатель — член семьи за резервиста</h3><BlankFields fields={recipientFields} /></section>
+      <section><h2>3. Родство и получатели</h2><p>Являетесь родственником участника СВО? ☐ Да ☐ Нет. Получали выплаты в связи с родством? ☐ Да ☐ Нет.</p><BlankFields fields={kinshipFields} /><h3>Получатель — член семьи за кандидата в резерв</h3><BlankFields fields={recipientFields} /></section>
       <section><h2>4. Выплаты и меры</h2>{categoryDefinitions.map((category, index) => <div className="fp-print-category" key={category.title}><h3>{index + 1}. {category.title}</h3><p>Ответ: ☐ Да ☐ Нет {index === 8 && '☐ Планируется при наличии документа'}</p>
         {index === 5 ? <p>Документ не требуется.</p> : <BlankFields fields={paymentFields(index, { id: '', form: 'Денежная' }, { ...blankContent, categoryAnswers: { 8: 'Да' } })} />}
         {index === 8 && <p>Для планируемой меры: предполагаемый год ________________; документ-основание ____________________________.</p>}
@@ -144,7 +144,7 @@ export function TemplatesScreen(m: ProfileModel) {
       <section><h2>6. Приложения</h2><p>Перечень файлов: __________________________________________________</p><p>Подписанный скан согласия по форме действующего оператора: ______________________________</p></section>
     </> : template.id === 'payment' ? <><section><h2>Описание записи</h2><BlankFields fields={[
       { key: 'category', label: 'Категория выплаты или меры', required: true }, { key: 'recipient', label: 'Получатель (ФИО и вид получателя)', required: true },
-      { key: 'relation', label: 'Связь с резервистом / родственником, если применимо' }, { key: 'title', label: 'Наименование выплаты или меры', required: true },
+      { key: 'relation', label: 'Связь с кандидатом в резерв / родственником, если применимо' }, { key: 'title', label: 'Наименование выплаты или меры', required: true },
       { key: 'amount', label: 'Сумма либо описание натуральной формы' }, { key: 'payer', label: 'Плательщик / орган назначения' },
       { key: 'basis', label: 'Основание, реквизиты и применимая редакция НПА', required: true }, { key: 'event', label: 'Событие и дата, если применимо' },
       { key: 'period', label: 'Период, к которому относится основание', required: true }, { key: 'date', label: 'Дата фактического перечисления' },

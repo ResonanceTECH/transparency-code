@@ -1,5 +1,5 @@
 import { signalDefinitions } from './data'
-import { activeRecords, dateText, moneyCents } from './fields'
+import { activeRecords, dateText, moneyCents, optionLabel } from './fields'
 import type { Entity, ProfileContent } from './types'
 
 export type ProfileSignal = typeof signalDefinitions[number] & {
@@ -26,7 +26,7 @@ export function profileSignals(content: ProfileContent): ProfileSignal[] {
     left: [['Получатель', relative.recipient], ['Сумма', `${relative.amount} ₽`], ['Основание в записи', relative.basisType],
       ['Период', `${dateText(relative.periodFrom)} — ${dateText(relative.periodTo)}`]],
     right: [['Родственник', `${content.kinship.fullName} · ${content.kinship.degree.toLowerCase()}`],
-      ['Связь в анкете', relative.recipientKind], ['Документ', content.attachments.find((file) => file.id === relative.documentId)?.name || 'Не приложен']],
+      ['Связь в анкете', optionLabel(relative.recipientKind)], ['Документ', content.attachments.find((file) => file.id === relative.documentId)?.name || 'Не приложен']],
     quote: 'Содержание загруженного файла не распознавалось. Сопоставьте выбранное основание с оригиналом документа.'
   })
 

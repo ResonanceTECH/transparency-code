@@ -82,7 +82,7 @@ export default function FinancialProfile({
     .map((word) => word[0])
     .join('')
     .toUpperCase()
-  const roleLabel = role === 'reservist' ? 'Резервист' : 'Проверяющий'
+  const roleLabel = role === 'reservist' ? 'Кандидат в резерв' : 'Проверяющий'
   const closedEditing = role === 'reservist' && m.reviewerClosed
     && ['profile', 'kinship', 'payments', 'category', 'payment', 'support', 'insurance', 'housing', 'activities', 'selfcheck'].includes(screen)
   const modalRef = useRef<HTMLElement | null>(null)
@@ -141,14 +141,14 @@ export default function FinancialProfile({
           </span>
           <div>
             <strong>РЕЗОНАНС</strong>
-            <small>Финансовый профиль резервиста</small>
+            <small>Финансовый профиль кандидата в резерв</small>
           </div>
         </button>
         <div className="fp-workspace-label">
           <span />
           {role === 'reservist' ? 'ЛИЧНЫЙ КАБИНЕТ' : 'УПОЛНОМОЧЕННЫЙ СПЕЦИАЛИСТ'}
         </div>
-        <nav aria-label={role === 'reservist' ? 'Разделы резервиста' : 'Разделы проверяющего'}>
+        <nav aria-label={role === 'reservist' ? 'Разделы кандидата в резерв' : 'Разделы проверяющего'}>
           {nav.map((item) => (
             <button
               key={item.screen}
@@ -158,7 +158,7 @@ export default function FinancialProfile({
                disabled={role === 'reviewer' && !sent && !['queue', 'instructions', 'templates'].includes(item.screen)}
               title={
                  role === 'reviewer' && !sent && !['queue', 'instructions', 'templates'].includes(item.screen)
-                  ? 'Доступно после отправки версии резервистом'
+                  ? 'Доступно после отправки версии кандидатом в резерв'
                   : item.title
               }
             >
@@ -284,7 +284,7 @@ export default function FinancialProfile({
               <LockKeyhole size={35} />
               <h2>Материал ещё не представлен</h2>
               <p>
-                Личный черновик резервиста недоступен. Отправьте профиль в демонстрационной роли резервиста.
+                Личный черновик кандидата в резерв недоступен. Отправьте профиль в демонстрационной роли кандидата в резерв.
               </p>
             </Panel>
           ) : (

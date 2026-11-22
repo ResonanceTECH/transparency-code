@@ -75,7 +75,7 @@ export function HomeScreen(m: ProfileModel) {
           <div className="fp-recent-actions">{m.audit.filter((event) => event.role === 'reservist').slice(-3).reverse().map((event, index) =>
             <div key={index}><span /><div><small>{event.time}</small><strong>{event.action}</strong></div></div>)}</div>
         </Panel>
-        <Notice tone="neutral" icon={<LockKeyhole size={20} />}><strong>{m.sent ? 'Зафиксирована только отправленная версия.' : 'Личный черновик доступен только резервисту.'}</strong><br />
+        <Notice tone="neutral" icon={<LockKeyhole size={20} />}><strong>{m.sent ? 'Зафиксирована только отправленная версия.' : 'Личный черновик доступен только кандидату в резерв.'}</strong><br />
           Изменения, подсказки и история черновика не передаются проверяющему.
           <br /><button className="fp-text-button" onClick={() => m.navigate('instructions')}>Правила передачи сведений<ArrowRight size={14} /></button>
         </Notice>
@@ -136,8 +136,8 @@ export function KinshipScreen(m: ProfileModel) {
           {m.kinship.receivedPayments === 'Да' && <button className="fp-linked-record" onClick={() => m.navigate('insurance')}><Link2 size={19} /><div><strong>Сведения о выплатах за родственника</strong><small>Отдельная связь с основанием</small></div><ChevronRight size={19} /></button>}
         </> : <Notice tone="teal">Дополнительные поля родства закрыты. Данные родственника не запрашиваются.</Notice>}
       </Panel>
-      <Panel><PanelTitle title="Выплата члену семьи за резервиста" subtitle="Отдельный блок: получатель не сам резервист" action={<Badge tone="blue">{m.familyRecipients.length} получателей</Badge>} />
-        <div className="fp-question"><strong>Получал ли член семьи выплату за резервиста?</strong><Choice value={m.categoryAnswers[6]} onChange={(value) => m.setCategoryAnswer(6, value)} /></div>
+      <Panel><PanelTitle title="Выплата члену семьи за кандидата в резерв" subtitle="Отдельный блок: получатель не сам кандидат в резерв" action={<Badge tone="blue">{m.familyRecipients.length} получателей</Badge>} />
+        <div className="fp-question"><strong>Получал ли член семьи выплату за кандидата в резерв?</strong><Choice value={m.categoryAnswers[6]} onChange={(value) => m.setCategoryAnswer(6, value)} /></div>
         {m.categoryAnswers[6] === 'Да' ? <>
           <div className="fp-record-list">{m.familyRecipients.map((recipient, index) => <fieldset className="fp-record-editor" key={recipient.id}>
             <legend>Получатель {index + 1}</legend><DataFields m={m} fields={recipientFields} values={recipient} onChange={(key, value) => m.updateRecipient(recipient.id, key, value)} />
@@ -152,7 +152,7 @@ export function KinshipScreen(m: ProfileModel) {
       <Panel className="fp-privacy-card"><UsersRound size={28} /><h2>Минимум данных о родственнике</h2><p>Только ФИО, степень родства и предусмотренный анкетой статус.</p>
         <ul><li>Без подробностей службы</li><li>Без медицинских сведений</li><li>Без полного финансового профиля</li></ul></Panel>
       <Panel><PanelTitle title="Не путайте получателей" />
-        <p>Выплата резервисту за родственника и выплата члену семьи за резервиста — разные записи.</p>
+        <p>Выплата кандидату в резерв за родственника и выплата члену семьи за кандидата в резерв — разные записи.</p>
         <Notice>Год рождения нужен для получателя — члена семьи, но не для минимальной карточки участника СВО.</Notice>
       </Panel>
     </div>
@@ -197,7 +197,7 @@ export function CategoryScreen(m: ProfileModel) {
             {[7, 9].includes(m.activeCategory) && <Notice tone="blue">Натуральные и неденежные меры учитываются отдельно, не прибавляются к денежным поступлениям.</Notice>}
           </>}
     </Panel><SavePayments m={m} />
-  </div><div className="fp-stack"><Panel className="fp-explain-card"><span className="fp-explain-symbol">{category.icon}</span><h2>{m.activeCategory === 6 ? 'Это не личная выплата резервиста' : 'Основание важнее банковской справки'}</h2><p>{category.note}</p>
+  </div><div className="fp-stack"><Panel className="fp-explain-card"><span className="fp-explain-symbol">{category.icon}</span><h2>{m.activeCategory === 6 ? 'Это не личная выплата кандидата в резерв' : 'Основание важнее банковской справки'}</h2><p>{category.note}</p>
     {m.activeCategory === 6 && <button className="fp-text-button" onClick={() => m.navigate('kinship')}>Добавить или изменить получателей<ArrowRight size={14} /></button>}</Panel>
     <Notice tone="neutral">Нет банковских выписок и автоматического юридического решения. Значимость документов оценивает кадровый специалист.</Notice></div></div></>
 }
@@ -227,11 +227,11 @@ export function InsuranceScreen(m: ProfileModel) {
       {m.personalInsuranceAnswer === 'Да' ? <PaymentRecords m={m} category={4} recipientKind="Сам резервист" /> : <Notice tone="neutral">Дополнительные поля личной выплаты закрыты.</Notice>}</Panel>
     <Panel><PanelTitle title="Выплаты за родственника — участника СВО" action={<Badge tone="blue"><Link2 size={13} />Связанные сведения</Badge>} />
       {m.relativeAnswer === 'Да' ? <><div className="fp-question"><strong>Получали ли вы выплату за родственника?</strong><Choice value={m.kinship.receivedPayments} onChange={(value) => m.updateKinship('receivedPayments', value)} /></div>
-        {m.kinship.receivedPayments === 'Да' && <><div className="fp-recipient-chain"><div><span>ПОЛУЧАТЕЛЬ</span><strong>{m.candidate.fullName}</strong><small>Резервист</small></div><ArrowRight size={19} /><div><span>СВЯЗЬ</span><strong>{m.kinship.fullName}</strong><small>{m.kinship.degree} · {m.kinship.status}</small></div></div>
+        {m.kinship.receivedPayments === 'Да' && <><div className="fp-recipient-chain"><div><span>ПОЛУЧАТЕЛЬ</span><strong>{m.candidate.fullName}</strong><small>Кандидат в резерв</small></div><ArrowRight size={19} /><div><span>СВЯЗЬ</span><strong>{m.kinship.fullName}</strong><small>{m.kinship.degree} · {m.kinship.status}</small></div></div>
           <PaymentRecords m={m} category={4} recipientKind="Резервист за родственника" /></>}
       </> : <Notice tone="neutral">Родство не указано. Сведения о выплатах за родственника не запрашиваются.</Notice>}
     </Panel><SavePayments m={m} />
-  </div><div className="fp-stack"><Panel className="fp-explain-card"><span className="fp-explain-symbol"><Link2 size={25} /></span><h2>Получатель ≠ основание</h2><p>Выплату получил резервист, но право на неё может быть связано с родственником. Сохраняйте эту связь отдельно.</p></Panel>
+  </div><div className="fp-stack"><Panel className="fp-explain-card"><span className="fp-explain-symbol"><Link2 size={25} /></span><h2>Получатель ≠ основание</h2><p>Выплату получил кандидат в резерв, но право на неё может быть связано с родственником. Сохраняйте эту связь отдельно.</p></Panel>
     <Notice tone="amber">Сверьте выбранное основание с документом. Несовпадение — вопрос для уточнения, не автоматический отказ в назначении.</Notice></div></div></>
 }
 
@@ -311,7 +311,7 @@ export function DocumentsScreen(m: ProfileModel) {
           <small className="fp-footnote">Оценка не устанавливает нарушение и сама по себе не меняет статус анкеты. Уточнение запрашивается отдельной кнопкой.</small>
         </>}
       </Panel> : <>
-        <Panel><PanelTitle title="Источники сведений" /><div className="fp-source-row"><FileText size={20} /><div><strong>Ручная загрузка</strong><small>Документы резервиста</small></div><Badge tone="teal">Доступна</Badge></div>
+        <Panel><PanelTitle title="Источники сведений" /><div className="fp-source-row"><FileText size={20} /><div><strong>Ручная загрузка</strong><small>Документы кандидата в резерв</small></div><Badge tone="teal">Доступна</Badge></div>
           <Notice tone="neutral"><strong>Сведения не получены</strong><br />Нет ответа ведомственного источника ≠ нет дохода или выплаты.</Notice></Panel>
         <Panel><PanelTitle title="Когда справка не нужна" /><p>Пенсии и социальные выплаты — только «Да / Нет». Документ единовременной выплаты — при наличии.</p></Panel>
         <button className="fp-button fp-full" onClick={() => m.navigate('selfcheck')}>Проверить комплект<ArrowRight size={16} /></button>
@@ -375,21 +375,21 @@ export function QueueScreen(m: ProfileModel, onQuickLogin?: () => void) {
     <Panel className="fp-queue-panel"><PanelTitle title="Назначенные материалы" subtitle="Только отправленные комплекты; черновики и статические заглушки не учитываются" action={
       <label className="fp-search"><Search size={18} /><input aria-label="Поиск материалов" placeholder="ФИО или номер профиля" value={m.query} onChange={(e) => m.setQuery(e.target.value)} /></label>} />
       <div className="fp-table-tabs">{['Все', 'Поступило', 'Принят к рассмотрению', 'На уточнении', 'Завершено'].map((tab) => <button key={tab} className={tab === m.queueFilter ? 'active' : ''} onClick={() => m.setQueueFilter(tab)}>{tab}{tab === 'Все' && <span>{m.queueItems.length}</span>}</button>)}</div>
-      <div className="fp-table-scroll"><table className="fp-table"><thead><tr><th>Профиль</th><th>Резервист</th><th>Представлено / период</th><th>Сопоставление</th><th>Статус</th><th /></tr></thead>
+      <div className="fp-table-scroll"><table className="fp-table"><thead><tr><th>Профиль</th><th>Кандидат в резерв</th><th>Представлено / период</th><th>Сопоставление</th><th>Статус</th><th /></tr></thead>
         <tbody>{items.length ? items.map((item) => <tr key={item.profile_id}><td><strong className="fp-table-id" title={item.profile_id}>ФП-{item.profile_id.slice(0, 8)}</strong><small>Версия {item.version_number}</small></td>
           <td><div className="fp-table-person"><span className="fp-avatar">{item.full_name.split(/\s+/).slice(0, 2).map((word) => word[0]).join('')}</span><div><strong>{item.full_name}</strong><small>{item.program} · {item.program_year}</small></div></div></td>
           <td>{timeText(item.submitted_at)}<small>{item.reporting_period}</small>{item.is_demo && <Badge tone="neutral">Учебный комплект</Badge>}</td>
           <td><Badge tone={item.pending_signals ? 'amber' : 'blue'}>{item.pending_signals} нерассмотренных сигналов</Badge></td>
           <td><Badge tone={['completed', 'removed'].includes(item.status) ? 'teal' : item.status === 'clarification' ? 'amber' : 'blue'}>{statusText(item.status)}</Badge></td>
           <td><button className="fp-icon-button" disabled={m.busy} aria-label={`Открыть ${item.profile_id}`} onClick={() => m.openMaterial(item.profile_id)}><ChevronRight size={18} /></button></td></tr>)
-          : <tr><td colSpan={6}><div className="fp-empty fp-empty-queue"><Inbox size={30} /><h2>{m.queueItems.length ? 'Материалы не найдены' : 'Нет поступивших материалов'}</h2><p>{m.queueItems.length ? 'Измените поиск или фильтр.' : 'Материал появится после отправки резервистом и назначения доступа.'}</p></div></td></tr>}</tbody>
+          : <tr><td colSpan={6}><div className="fp-empty fp-empty-queue"><Inbox size={30} /><h2>{m.queueItems.length ? 'Материалы не найдены' : 'Нет поступивших материалов'}</h2><p>{m.queueItems.length ? 'Измените поиск или фильтр.' : 'Материал появится после отправки кандидатом в резерв и назначения доступа.'}</p></div></td></tr>}</tbody>
       </table></div><div className="fp-table-footer"><span>Показано {items.length} из {m.queueItems.length} · только вымышленные сведения</span><span>Серверная очередь</span></div>
     </Panel>
     <div className="fp-columns fp-queue-bottom"><Notice icon={<LockKeyhole size={20} />}><strong>Черновики не поступают в очередь.</strong><br />
-      Материал появляется только после отправки резервистом и назначения вам доступа.
+      Материал появляется только после отправки кандидатом в резерв и назначения вам доступа.
       <div className="fp-queue-hint"><span>Для показа можно открыть отдельный готовый учебный комплект. Он не заменяет материалы очереди и не использует личный черновик.</span>
         <button className="fp-button fp-button-outline" disabled={m.busy} onClick={m.loadDemoMaterial}><Upload size={15} />Открыть демо-комплект</button>
-        {onQuickLogin && <button className="fp-text-button" onClick={onQuickLogin}><UserRound size={15} />Войти как резервист</button>}</div>
+        {onQuickLogin && <button className="fp-text-button" onClick={onQuickLogin}><UserRound size={15} />Войти как кандидат в резерв</button>}</div>
     </Notice><Panel><PanelTitle title="Порядок приёма" /><div className="fp-inline-steps"><span><i>1</i>Комплектность</span><ChevronRight size={15} /><span><i>2</i>Сопоставление</span><ChevronRight size={15} /><span><i>3</i>Обоснованный статус</span></div></Panel></div>
   </>
 }
@@ -428,8 +428,8 @@ export function CaseScreen(m: ProfileModel) {
         <button className="fp-text-button" onClick={() => { if (scan) m.chooseDocument(scan.id); m.navigate('documents') }}>Проверить читаемость и подпись<ArrowRight size={15} /></button>
       </Panel>
       <Panel><PanelTitle title="Представленные сведения о доходах" subtitle="Суммы введённых записей, не подтверждённый доход для «Справок БК»" />
-        <div className="fp-financial-cards"><div><span className="fp-financial-icon fp-teal"><UserRound size={21} /></span><small>Денежные записи резервиста</small><strong>{m.summary.personal}<span> ₽</span></strong><p>{m.summary.personalRecords} записей · возможный дубль автоматически не вычитается</p></div>
-          <div><span className="fp-financial-icon fp-blue"><UsersRound size={21} /></span><small>Отдельно: член семьи</small><strong>{m.summary.family}<span> ₽</span></strong><p>Не личный доход резервиста</p></div></div>
+        <div className="fp-financial-cards"><div><span className="fp-financial-icon fp-teal"><UserRound size={21} /></span><small>Денежные записи кандидата в резерв</small><strong>{m.summary.personal}<span> ₽</span></strong><p>{m.summary.personalRecords} записей · возможный дубль автоматически не вычитается</p></div>
+          <div><span className="fp-financial-icon fp-blue"><UsersRound size={21} /></span><small>Отдельно: член семьи</small><strong>{m.summary.family}<span> ₽</span></strong><p>Не личный доход кандидата в резерв</p></div></div>
         <div className="fp-noncash-row">{activeRecords(content, 8).map((row) => <div key={row.id}><Home size={21} /><span><strong>Жилищная мера · {content.categoryAnswers[8] === 'Планируется' ? `планируется в ${row.expectedYear}` : row.housingKind}</strong><small>{row.basis} · отдельная мера</small></span></div>)}
           {activeRecords(content, 7).filter((row) => row.form === 'Натуральная').map((row) => <div key={row.id}><BriefcaseBusiness size={21} /><span><strong>Помощь фонда · натуральная форма</strong><small>{row.description} · отдельно от денежных выплат</small></span></div>)}</div>
       </Panel>
@@ -471,7 +471,7 @@ export function SignalsScreen(m: ProfileModel) {
       <div className="fp-document-quote"><FileText size={18} /><div><span>Ограничение автоматической проверки</span><blockquote>{signal.quote}</blockquote></div></div>
       <div className="fp-review-followup"><strong>Что сопоставить</strong><p>{signal.action}</p></div>
       {decision && <div className="fp-review-record"><div><Badge tone={decision.status === 'Рассмотрено' ? 'teal' : 'blue'}>{decision.status}</Badge><small>{decision.author} · версия {m.signalVersion}</small></div><p>{decision.comment}</p></div>}
-      <div className="fp-decision-form"><h3>Результат сопоставления</h3><label className="fp-field"><span className="fp-field-label">Комментарий и вопрос резервисту<em aria-hidden="true"> *</em></span><textarea aria-label="Комментарий и вопрос резервисту" maxLength={2000} value={m.reviewComment} onChange={(e) => m.setReviewComment(e.target.value)} rows={3} placeholder="Укажите сопоставленные сведения и конкретный вопрос…" /></label>
+      <div className="fp-decision-form"><h3>Результат сопоставления</h3><label className="fp-field"><span className="fp-field-label">Комментарий и вопрос кандидату в резерв<em aria-hidden="true"> *</em></span><textarea aria-label="Комментарий и вопрос кандидату в резерв" maxLength={2000} value={m.reviewComment} onChange={(e) => m.setReviewComment(e.target.value)} rows={3} placeholder="Укажите сопоставленные сведения и конкретный вопрос…" /></label>
         <div className="fp-decision-actions"><button className="fp-button" disabled={m.signalReadOnly || m.reviewComment.trim().length < 5} onClick={m.requestClarification}><MessageSquareText size={16} />Запросить уточнение</button>
           <button className="fp-button fp-button-outline" disabled={m.signalReadOnly || m.reviewComment.trim().length < 5} onClick={() => m.recordSignalDecision('Рассмотрено')}><CheckCircle2 size={15} />Отметить рассмотренным</button>
           <button className="fp-text-button" disabled={m.signalReadOnly || m.reviewComment.trim().length < 5} onClick={() => m.recordSignalDecision('Исключено с обоснованием')}>Исключить вопрос</button>
@@ -492,21 +492,21 @@ export function MessagesScreen(m: ProfileModel) {
       <div className="fp-formal-question"><MessageSquareText size={23} /><p>{m.question}</p></div>
     </Panel>
       {m.role === 'reservist' && m.phase === 'clarification' ? <Panel><PanelTitle title="Ответ и уточнённые сведения" subtitle={`Изменения сохраняются в личном черновике версии ${m.workingVersion}`} />
-        <label className="fp-field"><span className="fp-field-label">Пояснение резервиста<em aria-hidden="true"> *</em></span><textarea aria-label="Пояснение резервиста" maxLength={4000} value={reply} rows={4} onChange={(e) => m.setReply(e.target.value)} placeholder="Поясните основание и внесённые исправления…" /></label>
+        <label className="fp-field"><span className="fp-field-label">Пояснение кандидата в резерв<em aria-hidden="true"> *</em></span><textarea aria-label="Пояснение кандидата в резерв" maxLength={4000} value={reply} rows={4} onChange={(e) => m.setReply(e.target.value)} placeholder="Поясните основание и внесённые исправления…" /></label>
         <div className="fp-correction-links"><button className="fp-text-button" onClick={() => m.navigate('payments')}>Изменить выплаты<ArrowRight size={14} /></button>
           <button className="fp-text-button" onClick={() => m.navigate('documents')}>Проверить документы<ArrowRight size={14} /></button>
           <button className="fp-text-button" onClick={() => m.navigate('profile')}>Изменить анкету<ArrowRight size={14} /></button></div>
         <small className="fp-footnote">Исправьте нужные поля или замените файл в соответствующем разделе. Подготовка версии не удаляет записи и не изменяет основания автоматически.</small>
         <button className="fp-button" disabled={reply.trim().length < 10} onClick={m.prepareCorrection}>Подготовить версию {m.workingVersion}<ArrowRight size={16} /></button>
       </Panel> : <Panel><PanelTitle title={`Пояснение в представленной версии ${m.presented?.version}`} />{reply ? <><p className="fp-reply-text">{reply}</p><Badge tone="teal">Версия {m.presented?.version} представлена</Badge></>
-        : <div className="fp-waiting"><Clock3 size={22} /><div><strong>Ожидается ответ и новая версия</strong><p>Изменения в черновике резервиста вам недоступны.</p></div></div>}</Panel>}
+        : <div className="fp-waiting"><Clock3 size={22} /><div><strong>Ожидается ответ и новая версия</strong><p>Изменения в черновике кандидата в резерв вам недоступны.</p></div></div>}</Panel>}
       <Panel><PanelTitle title="История отправленных сообщений" subtitle="Личный текст ответа до повторной отправки сюда не попадает" />
         <div className="fp-stack">{m.messages.map((message) => <div className="fp-formal-question" key={message.id}><div><strong>{message.kind === 'question' ? 'Вопрос' : 'Ответ'} · {message.author_name}</strong><small>{timeText(message.created_at)}{message.version_number && ` · версия ${message.version_number}`}</small><p>{message.text}</p></div></div>)}</div>
       </Panel>
     </div><div className="fp-stack"><Panel className="fp-version-card"><PanelTitle title="Версии не перезаписываются" />
       {m.versions.map((version) => <div className="fp-version-line" key={version.version}><span>{version.version}</span><div><strong>Представленная версия {version.version}</strong><small>Исходные записи и документы сохранены</small></div><LockKeyhole size={18} /></div>)}
       {!m.reviewerClosed && <p>{m.role === 'reviewer' ? 'Новый черновик недоступен до повторной отправки.' : `Ответ и правки версии ${m.workingVersion} остаются личными до отправки.`}</p>}
-    </Panel><Notice icon={<LockKeyhole size={19} />}>После исправлений резервист снова проверяет комплектность и отправляет новую зафиксированную версию.</Notice>
+    </Panel><Notice icon={<LockKeyhole size={19} />}>После исправлений кандидат в резерв снова проверяет комплектность и отправляет новую зафиксированную версию.</Notice>
       <Panel><PanelTitle title="Это рабочее уточнение" /><p>Кадровый специалист может связаться с кандидатом лично по телефону и почте. Технические вопросы — операторам по контактам внизу платформы.</p></Panel></div></div>
   </>
 }
@@ -516,7 +516,7 @@ export function ResultScreen(m: ProfileModel) {
     <div className="fp-material-strip"><div><span className="fp-avatar">К</span><div><strong>{m.visibleCandidate.fullName}</strong><small>{m.profileId} · представленная версия {m.presented?.version}</small></div></div>
       <button className="fp-button fp-button-outline" onClick={m.exportSummary}><Download size={16} />Выгрузить учебный результат</button></div>
     {m.reviewerClosed ? <>
-      <Panel className="fp-result-banner"><span><BadgeCheck size={36} /></span><div><Badge tone="teal">Статус зафиксирован</Badge><h2>{m.profileStatus}</h2><p>Статус отображается резервисту. Это результат рассмотрения сведений, не решение о назначении.</p></div><div><small>Уполномоченный специалист</small><strong>{m.decisionAuthor}</strong></div></Panel>
+      <Panel className="fp-result-banner"><span><BadgeCheck size={36} /></span><div><Badge tone="teal">Статус зафиксирован</Badge><h2>{m.profileStatus}</h2><p>Статус отображается кандидату в резерв. Это результат рассмотрения сведений, не решение о назначении.</p></div><div><small>Уполномоченный специалист</small><strong>{m.decisionAuthor}</strong></div></Panel>
       <div className="fp-columns fp-form-columns"><Panel><PanelTitle title="Основание и комментарий" /><div className="fp-result-basis"><FileCheck2 size={26} /><div><strong>{m.decisionBasis}</strong><small>Подтверждающее основание внесено человеком</small></div></div><p className="fp-reply-text">{m.decisionComment}</p>
         {m.decisionDocument && <FileRow name={m.decisionFile} url={m.decisionDocument.url} note="Подтверждающий документ результата" onPreview={m.showDocument} onDownload={m.recordDownload} />}</Panel>
         <div className="fp-stack"><Panel><PanelTitle title="Сохранённая история" />{m.versions.map((version) => <div className="fp-version-line" key={version.version}><span>{version.version}</span><div><strong>Версия {version.version}</strong><small>{version.createdAt} · {version.documentCount} документов</small></div><LockKeyhole size={18} /></div>)}
@@ -529,11 +529,11 @@ export function ResultScreen(m: ProfileModel) {
       {m.finalDecision && <>{m.decisionDocument && <FileRow name={m.decisionFile} url={m.decisionDocument.url} onPreview={m.showDocument} onDownload={m.recordDownload} />}<UploadBox label="Подтверждающий документ результата" onUpload={m.reviewReadOnly ? undefined : m.attachDecision} /></>}
       {m.finalDecision && (m.unassessedDocuments > 0 || m.unresolvedSignals > 0 || m.phase === 'clarification') && <Notice tone="amber">
         Для закрытия сначала завершите работу с текущей версией: документов без пригодной ручной оценки — {m.unassessedDocuments}; неразрешённых сигналов — {m.unresolvedSignals}.
-        {m.phase === 'clarification' && ' Ожидается повторное представление резервистом.'}
+        {m.phase === 'clarification' && ' Ожидается повторное представление кандидатом в резерв.'}
         <br /><button className="fp-text-button" onClick={() => m.navigate('documents')}>Оценить документы</button><button className="fp-text-button" onClick={() => m.navigate('signals')}>Рассмотреть сигналы</button>
       </Notice>}
       <button className="fp-button fp-full" disabled={!m.canDecide} onClick={m.complete}><BadgeCheck size={17} />{m.finalDecision ? 'Зафиксировать итоговый статус' : 'Зафиксировать статус'}</button>
-    </Panel><div className="fp-stack"><Panel className="fp-privacy-card"><ShieldCheck size={28} /><h2>Решение принимает человек</h2><p>Для завершения или снятия обязательны реквизиты, документ-основание и комментарий. Статус виден резервисту.</p></Panel>
+    </Panel><div className="fp-stack"><Panel className="fp-privacy-card"><ShieldCheck size={28} /><h2>Решение принимает человек</h2><p>Для завершения или снятия обязательны реквизиты, документ-основание и комментарий. Статус виден кандидату в резерв.</p></Panel>
       <Panel><PanelTitle title="Рабочие состояния материала" /><ul className="fp-status-list"><li><Badge tone="blue">Принят к рассмотрению</Badge></li><li><Badge tone="amber">Требуются уточнения</Badge></li><li><Badge tone="neutral">Снят с рассмотрения обоснованием</Badge></li><li><Badge tone="teal">Рассмотрение завершено</Badge></li></ul></Panel>
       <Notice tone="neutral">Все действия фиксируются в журнале учебного сценария. После закрытия анкеты её рассмотрение в платформе заканчивается.</Notice></div></div>}
   </>
@@ -548,7 +548,7 @@ export function HistoryScreen(m: ProfileModel) {
       {m.role === 'reviewer' && <button className="fp-text-button" onClick={() => { m.chooseSignalVersion(version.version); m.navigate('signals') }}>Сигналы этой версии</button>}
       <details className="fp-version-files"><summary>Оригиналы файлов этой версии ({version.documentCount})</summary><div className="fp-stack">{version.attachments.map((file) => <FileRow key={file.id} name={file.name} url={file.url} note={file.section} onPreview={m.showDocument} onDownload={m.recordDownload} />)}</div></details>
     </Panel>)}
-      {m.versions.length === 1 && <Panel><PanelTitle title="Новая версия ещё не представлена" action={<Badge tone="neutral">Ожидание</Badge>} /><p>Личный черновик и самопроверка резервиста недоступны проверяющему.</p></Panel>}
+      {m.versions.length === 1 && <Panel><PanelTitle title="Новая версия ещё не представлена" action={<Badge tone="neutral">Ожидание</Badge>} /><p>Личный черновик и самопроверка кандидата в резерв недоступны проверяющему.</p></Panel>}
     </div>
     {m.versions.length > 1 && <Panel><PanelTitle title="Изменения между последними версиями" action={<button className="fp-text-button" onClick={m.loadDiff}>Сравнить версии</button>} />
       {m.versionDiff && <><p>Версия {m.versionDiff.version_from} → {m.versionDiff.version_to}: {m.versionDiff.changed} изменений.</p><div className="fp-table-scroll"><table className="fp-table"><thead><tr><th>Поле</th><th>Было</th><th>Стало</th></tr></thead><tbody>
@@ -571,15 +571,15 @@ export function InstructionsScreen(m: ProfileModel) {
       <div className="fp-document-exception"><ShieldCheck size={19} /><div><strong>Согласие на обработку персональных данных</strong><small>Подписанный скан обязателен. Подтверждение передачи версии галочкой его не заменяет.</small></div></div>
       <p className="fp-instruction-note">Банковские выписки и справки по счетам не прикрепляются. Поздняя дата перечисления сама по себе не является противоречием периоду службы.</p>
     </Panel>
-    <Panel><PanelTitle title="Раздельный учёт сведений" /><div className="fp-separation-row"><UsersRound size={19} /><div><strong>Выплаты членам семьи</strong><small>Получатель, ФИО, год рождения и связь с кандидатом. Не личные поступления резервиста.</small></div></div>
-      <div className="fp-separation-row"><Link2 size={19} /><div><strong>Выплаты резервисту за родственника</strong><small>Сохраняется связь с основанием. Для родственника — только ФИО, степень родства и статус.</small></div></div>
+    <Panel><PanelTitle title="Раздельный учёт сведений" /><div className="fp-separation-row"><UsersRound size={19} /><div><strong>Выплаты членам семьи</strong><small>Получатель, ФИО, год рождения и связь с кандидатом. Не личные поступления кандидата в резерв.</small></div></div>
+      <div className="fp-separation-row"><Link2 size={19} /><div><strong>Выплаты кандидату в резерв за родственника</strong><small>Сохраняется связь с основанием. Для родственника — только ФИО, степень родства и статус.</small></div></div>
       <div className="fp-separation-row"><Home size={19} /><div><strong>Планируемые и неденежные меры</strong><small>Планируемое жильё и натуральная помощь не суммируются с денежными поступлениями.</small></div></div>
     </Panel>
     <Panel><PanelTitle title="Единая печатная анкета" /><p>Кнопка «Печать» собирает введённые поля всех вкладок в один документ. Можно распечатать его или выбрать «Сохранить как PDF» в окне браузера.</p>
-      <p className="fp-instruction-note">Резервист может печатать неполный черновик; незаполненные обязательные поля отмечены. Проверяющий печатает только отправленную версию. Печать не отправляет сведения.</p>
+      <p className="fp-instruction-note">Кандидат в резерв может печатать неполный черновик; незаполненные обязательные поля отмечены. Проверяющий печатает только отправленную версию. Печать не отправляет сведения.</p>
       <button className="fp-text-button" disabled={m.role === 'reviewer' && !m.sent} onClick={() => m.navigate('print')}>Открыть печатную анкету<ArrowRight size={15} /></button>
     </Panel>
-  </div><div className="fp-stack"><Panel className="fp-privacy-card"><LockKeyhole size={28} /><h2>Личный черновик доступен только резервисту</h2><p>Специалист получает доступ только к отправленной версии. Новые контакты, файлы и ответ до повторной отправки ему недоступны.</p><div className="fp-privacy-line"><History size={18} />Новая версия не переписывает исходные сведения и комментарии</div></Panel>
+  </div><div className="fp-stack"><Panel className="fp-privacy-card"><LockKeyhole size={28} /><h2>Личный черновик доступен только кандидату в резерв</h2><p>Специалист получает доступ только к отправленной версии. Новые контакты, файлы и ответ до повторной отправки ему недоступны.</p><div className="fp-privacy-line"><History size={18} />Новая версия не переписывает исходные сведения и комментарии</div></Panel>
     <Panel><PanelTitle title="Что считается качеством документа" /><p>Автоматически проверяются пустой файл, размер до 5 МБ, разрешённый формат и сигнатура контейнера. Это не полная проверка целостности.</p>
       <p className="fp-instruction-note">Полнота страниц, читаемость, подпись и применимость основания — оценка кадрового специалиста с комментарием. Нет OCR, распознавания подписи и юридического вывода ИИ.</p></Panel>
     <Panel><PanelTitle title="Шаблоны и памятки" /><p>Доступны пустая анкета, универсальный лист описания выплаты и чек-лист скана. Это учебные заготовки, а не единый каталог региональных НПА или официальных выплат.</p>

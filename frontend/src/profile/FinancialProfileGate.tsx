@@ -9,9 +9,8 @@ type SessionOut = { authenticated: boolean; user: PrototypeUser | null }
 const DEMO_PASSWORD = 'resonance-demo-2026'
 
 const demoAccounts: { username: string; label: string; note: string }[] = [
-  { username: 'reservist', label: 'Резервист', note: 'собственный серверный черновик' },
-  { username: 'reviewer', label: 'Проверяющий', note: 'только назначенные материалы' },
-  { username: 'demo', label: 'Демо-специалист', note: 'открывает контур проверяющего' }
+  { username: 'reservist', label: 'Кандидат в резерв', note: 'собственный серверный черновик' },
+  { username: 'reviewer', label: 'Проверяющий', note: 'только назначенные материалы' }
 ]
 
 function prototypeRole(role: string): 'reservist' | 'reviewer' | null {
@@ -118,7 +117,7 @@ export default function FinancialProfileGate() {
   const loginForm = (
     <div className={`fp-gate-card${activeRole ? ' fp-gate-card-overlay' : ''}`}>
       <span className="fp-gate-mark"><ShieldCheck size={30} /></span>
-      <h1>Финансовый профиль резервиста</h1>
+      <h1>Финансовый профиль кандидата в резерв</h1>
       <p>Учебный контур с серверным сохранением профилей и ролями из API.</p>
       <form onSubmit={submit}>
         <label>

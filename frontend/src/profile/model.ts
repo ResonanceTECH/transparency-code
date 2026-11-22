@@ -547,7 +547,7 @@ export function useProfileModel(role: Role = 'reservist', actorName = '', accoun
     window.addEventListener('beforeunload', warn)
     return () => window.removeEventListener('beforeunload', warn)
   }, [hasUnsavedChanges, busy])
-  useEffect(() => { document.title = screen === 'print' ? `Резонанс · анкета ${profileId}` : 'Резонанс · Финансовый профиль резервиста' }, [screen, profileId])
+  useEffect(() => { document.title = screen === 'print' ? `Резонанс · анкета ${profileId}` : 'Резонанс · Финансовый профиль кандидата в резерв' }, [screen, profileId])
   useEffect(() => { if (toast) { const timer = window.setTimeout(() => setToast(''), 4200); return () => window.clearTimeout(timer) } }, [toast])
 
   const nav = role === 'reservist' ? reservistNav : reviewerNav
