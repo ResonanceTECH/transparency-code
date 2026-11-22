@@ -24,9 +24,18 @@ class Settings(BaseSettings):
 
     upload_dir: str = "./uploads"
     session_ttl_hours: int = 12
+    # Флаг Secure на сессионной cookie; по умолчанию включен вне dev-среды.
+    # COOKIE_SECURE=false нужен при раздаче по чистому http без TLS-прокси.
+    cookie_secure: bool | None = None
     max_upload_mb: int = 5
     rule_version: str = "0.1.0"
     log_level: str = "INFO"
+
+    @property
+    def session_cookie_secure(self) -> bool:
+        if self.cookie_secure is not None:
+            return self.cookie_secure
+        return self.environment != "development"
 
 
 @lru_cache

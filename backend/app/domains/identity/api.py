@@ -46,8 +46,8 @@ async def login(
         httponly=True,
         samesite="lax",
         path="/",
-        # Secure только за TLS-прокси; в dev по http:// cookie должен работать.
-        secure=settings.environment != "development",
+        # Secure только за TLS-прокси; COOKIE_SECURE=false при раздаче по http://
+        secure=settings.session_cookie_secure,
     )
     return user
 

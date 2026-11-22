@@ -67,6 +67,7 @@ export ALLOW_DEMO_LOGIN='true'
 | `SECRET_KEY` | ключ подписи сессий | пусто, заполнить в `.env` |
 | `UPLOAD_DIR` | каталог оригиналов файлов | `./uploads` |
 | `ENVIRONMENT` | `development` или `production`, влияет на Secure-флаг cookie | `development` |
+| `COOKIE_SECURE` | принудительный Secure-флаг cookie, по умолчанию берется из `ENVIRONMENT`, `false` нужен при отдаче по http без TLS | не задан |
 | `ALLOW_DEMO_LOGIN` | создавать учебные аккаунты при старте | `true` |
 | `DEMO_PASSWORD` | пароль учебных аккаунтов | `resonance-demo-2026` |
 | `SESSION_TTL_HOURS` | время жизни сессии | `12` |
