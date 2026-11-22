@@ -4,6 +4,10 @@
 
 **Рабочий прототип** [http://135.106.155.218](http://135.106.155.218) · описание API [http://135.106.155.218/docs/](http://135.106.155.218/docs/)
 
+**Репозиторий** [github.com/ResonanceTECH/transparency-code](https://github.com/ResonanceTECH/transparency-code)
+
+**Видеодемонстрация** [drive.google.com](https://drive.google.com/drive/folders/1ZDhu66H5ODiLK5ClZtLpsWyNeRU80lzT?usp=sharing)
+
 Развертывание на сервере обновляется автоматически из ветки `main`.
 
 ## О чем продукт
@@ -42,6 +46,13 @@
 Анкета, файлы, версии, оценки и журнал хранятся на сервере. Перезагрузка страницы или вход из другого браузера показывает то же подтвержденное состояние.
 
 ## Запуск локально
+
+Сначала забрать код и перейти в каталог.
+
+```bash
+git clone https://github.com/ResonanceTECH/transparency-code.git
+cd transparency-code
+```
 
 ### Docker, весь стек одной командой
 
