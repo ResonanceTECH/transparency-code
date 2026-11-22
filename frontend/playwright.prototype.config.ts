@@ -1,8 +1,9 @@
 import { defineConfig } from '@playwright/test'
 
-const production = process.env.PROTOTYPE_MODE === 'preview'
-const port = Number(process.env.PROTOTYPE_PORT || (production ? 4174 : 4173))
-if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('PROTOTYPE_PORT должен быть целым числом от 1 до 65535')
+// Выделенные порты, чтобы прогон не цеплялся к dev-серверу разработчика:
+// backend 8123 (чистая SQLite, tools/test-stack.mjs), vite 4175 с прокси на него.
+const apiPort = 8123
+const port = 4175
 const localUrl = `http://127.0.0.1:${port}`
 
 export default defineConfig({
@@ -17,10 +18,19 @@ export default defineConfig({
   },
   workers: 1,
   reporter: 'list',
-  webServer: process.env.PROTOTYPE_URL ? undefined : {
-    command: `npx vite ${production ? 'preview' : ''} --host 127.0.0.1 --port ${port} --strictPort`,
-    url: `${localUrl}/prototype`,
-    reuseExistingServer: !process.env.CI,
-    timeout: 60_000,
-  },
+  webServer: process.env.PROTOTYPE_URL ? undefined : [
+    {
+      command: `node tools/test-stack.mjs --port ${apiPort} --stack-id prototype`,
+      url: `http://127.0.0.1:${apiPort}/api/health`,
+      reuseExistingServer: false,
+      timeout: 120_000,
+    },
+    {
+      command: `npx vite --host 127.0.0.1 --port ${port} --strictPort`,
+      url: `${localUrl}/prototype`,
+      env: { VITE_API_TARGET: `http://127.0.0.1:${apiPort}` },
+      reuseExistingServer: false,
+      timeout: 60_000,
+    },
+  ],
 })

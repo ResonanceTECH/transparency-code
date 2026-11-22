@@ -1,6 +1,7 @@
 import { defineConfig } from '@playwright/test'
 
-const port = Number(process.env.PROTOTYPE_PORT || 4173)
+const apiPort = 8124
+const port = 4176
 const localUrl = `http://127.0.0.1:${port}`
 
 export default defineConfig({
@@ -20,10 +21,19 @@ export default defineConfig({
   expect: { toHaveScreenshot: { animations: 'disabled', caret: 'hide', maxDiffPixelRatio: 0.02 } },
   webServer: process.env.PROTOTYPE_URL
     ? undefined
-    : {
-        command: `npx vite --host 127.0.0.1 --port ${port} --strictPort`,
-        url: `${localUrl}/prototype`,
-        reuseExistingServer: !process.env.CI,
-        timeout: 60_000
-      }
+    : [
+        {
+          command: `node tools/test-stack.mjs --port ${apiPort} --stack-id visual`,
+          url: `http://127.0.0.1:${apiPort}/api/health`,
+          reuseExistingServer: false,
+          timeout: 120_000,
+        },
+        {
+          command: `npx vite --host 127.0.0.1 --port ${port} --strictPort`,
+          url: `${localUrl}/prototype`,
+          env: { VITE_API_TARGET: `http://127.0.0.1:${apiPort}` },
+          reuseExistingServer: false,
+          timeout: 60_000,
+        },
+      ]
 })

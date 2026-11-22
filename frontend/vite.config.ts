@@ -64,12 +64,15 @@ const previewDocsFallback: Plugin = {
   },
 }
 
+// Автотесты проксируют API на изолированный backend через VITE_API_TARGET.
+const apiTarget = process.env.VITE_API_TARGET || 'http://127.0.0.1:8000'
+
 export default defineConfig({
   plugins: [react(), syntheticSamples, previewDocsFallback],
   // CSP в dev не включаем: Vite впрыскивает inline-скрипт HMR, который
   // блокируется script-src 'self'. В проде заголовки задаёт nginx.
-  server: { proxy: { '/api': 'http://127.0.0.1:8000', '/openapi.json': 'http://127.0.0.1:8000' } },
+  server: { proxy: { '/api': apiTarget, '/openapi.json': apiTarget } },
   preview: {
-    proxy: { '/api': 'http://127.0.0.1:8000', '/openapi.json': 'http://127.0.0.1:8000' },
+    proxy: { '/api': apiTarget, '/openapi.json': apiTarget },
   },
 })
