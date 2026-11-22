@@ -1,24 +1,42 @@
 import { chromium, expect } from '@playwright/test'
-import { mkdir } from 'node:fs/promises'
+import { mkdir, readFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const output = resolve(dirname(fileURLToPath(import.meta.url)), '..', process.env.SCREENSHOT_DIR || 'screenshots/interface-fixed')
 const baseUrl = process.env.PROTOTYPE_URL || 'http://127.0.0.1:4173/prototype'
+const password = process.env.DEMO_PASSWORD || 'resonance-demo-2026'
 await mkdir(output, { recursive: true })
 const browser = await chromium.launch({ headless: true })
-const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1 })
+const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1, timezoneId: 'Europe/Moscow' })
 const errors = []
 page.on('pageerror', error => errors.push(error.message))
 const nav = name => page.getByRole('navigation').getByRole('button', { name, exact: true }).click()
 const category = text => page.locator('.fp-category-row').filter({ hasText: text }).click()
 const back = () => page.getByRole('button', { name: 'К категориям выплат', exact: true }).click()
-const demoDocument = name => ({ name, mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n% Synthetic design fixture. No personal data.\n%%EOF') })
+const demoDocument = async (name, sample = 'Решение_региональная_поддержка_демо.pdf') => ({
+  name, mimeType: 'application/pdf',
+  buffer: await readFile(new URL(`../public/samples/${sample}`, import.meta.url))
+})
+let captures = 0
 async function capture(name) {
   await page.evaluate(async () => { await document.fonts.ready; if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); window.scrollTo(0, 0) })
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   await page.mouse.move(1400, 75)
+  await expect(page.locator('.fp-toast')).toHaveCount(0)
   await page.screenshot({ path: resolve(output, name), fullPage: true, animations: 'disabled', caret: 'hide' })
+  captures++
+}
+async function login(username) {
+  await page.getByLabel('Логин', { exact: true }).fill(username)
+  await page.getByLabel('Пароль', { exact: true }).fill(password)
+  await page.getByRole('button', { name: 'Войти', exact: true }).click()
+  await expect(page.locator('.fp-shell')).toBeVisible()
+}
+async function switchUser(username) {
+  await page.getByRole('button', { name: 'Выйти', exact: true }).click()
+  await expect(page.locator('.fp-shell')).toHaveCount(0)
+  await login(username)
 }
 async function send() {
   await page.getByRole('checkbox', { name: 'Я проверил сведения и подтверждаю передачу этой версии уполномоченному специалисту' }).check()
@@ -27,6 +45,11 @@ async function send() {
 
 try {
   await page.goto(baseUrl)
+  // Настоящий API-вход: состояние сценария остаётся в этой же открытой странице.
+  await login('reviewer')
+  await expect(page.locator('.fp-stat strong')).toHaveText(['0', '0', '0', '0'])
+  await capture('00-reviewer-empty-queue.png')
+  await switchUser('reservist')
   await expect(page.getByRole('heading', { name: 'Финансовый профиль', exact: true })).toBeVisible()
   await expect(page.getByRole('progressbar')).toHaveCount(1)
   await capture('01-reservist-dashboard.png')
@@ -62,21 +85,31 @@ try {
 
   await nav('Выплаты и меры')
   await category('Федеральная, региональная и муниципальная поддержка')
-  await page.getByLabel('Документ для региональной поддержки').setInputFiles(demoDocument('Решение_региональная_поддержка_демо.pdf'))
+  await page.getByLabel('Документ для региональной поддержки').setInputFiles(await demoDocument('Решение_региональная_поддержка_демо.pdf'))
   await page.getByRole('button', { name: 'Сохранить и вернуться', exact: true }).click()
   await category('Жилищные меры')
   await page.getByLabel('Предполагаемый год приобретения', { exact: true }).fill('2028')
   await page.getByRole('button', { name: 'Сохранить и вернуться', exact: true }).click()
+  await nav('Документы')
+  await page.getByLabel('Подписанный скан согласия на обработку ПДн', { exact: true }).setInputFiles(
+    await demoDocument('Согласие_ПДн_учебный.pdf', 'Согласие_ПДн_учебный.pdf')
+  )
+  await expect(page.getByRole('button', { name: 'Добавить учебный скан', exact: true })).toHaveCount(0)
   await nav('Самопроверка')
-  await expect(page.getByLabel('Готово 6 из 6 блоков', { exact: true })).toBeVisible()
+  await expect(page.getByLabel('Готово 7 из 7 блоков', { exact: true })).toBeVisible()
   await expect(page.locator('.fp-readiness-ready')).toBeVisible()
   await page.getByRole('checkbox').check()
   await capture('14-reservist-selfcheck-ready.png')
   await send()
-  await page.getByRole('button', { name: 'Проверяющий', exact: true }).click()
+  await switchUser('reviewer')
   await capture('15-reviewer-queue.png')
   await page.getByRole('button', { name: 'Открыть РВ-2026-0147', exact: true }).click()
   await page.getByRole('button', { name: 'Принять к рассмотрению', exact: true }).click()
+  await page.getByRole('button', { name: 'Проверить читаемость и подпись', exact: true }).click()
+  await page.getByLabel('Комментарий к документу', { exact: true }).fill('Учебный файл открыт вручную. Для реального согласия оператор должен сверить форму, страницы, подпись и дату; подлинность автоматически не проверена.')
+  await page.getByRole('button', { name: 'Сохранить оценку', exact: true }).click()
+  await capture('15a-reviewer-document-quality.png')
+  await nav('Карточка резервиста')
   await page.getByRole('button', { name: 'Сопоставить', exact: true }).click()
   await page.locator('.fp-signal-item').nth(2).click()
   await page.getByLabel('Комментарий и вопрос резервисту', { exact: true }).fill('Договор П-18/25 сопоставлен с периодом службы. Условия деятельности и применимость уведомления требуют уточнения; само пересечение дат не устанавливает нарушения.')
@@ -91,23 +124,33 @@ try {
   await page.locator('.fp-signal-item').nth(1).click()
   await capture('18-reviewer-signals-duplicate.png')
   await page.locator('.fp-signal-item').first().click()
-  await page.getByLabel('Комментарий и вопрос резервисту', { exact: true }).fill('Уточните связь компенсации 320 000 ₽ с родственником: в записи выбрано личное участие, а решение № К-24 указывает родство. Сверьте возможный повторный учёт назначения Н-42 и поясните условия преподавательского договора П-18/25.')
+  await page.getByLabel('Комментарий и вопрос резервисту', { exact: true }).fill('Уточните связь компенсации 320 000 ₽ с родственником: тип получателя и выбранное основание в анкете различаются. Сверьте возможный повторный учёт назначения Н-42 и условия договора П-18/25 по документам. OCR не выполнялся.')
   await page.getByRole('button', { name: 'Запросить уточнение', exact: true }).click()
-  await page.getByRole('button', { name: 'Резервист', exact: true }).click()
+  await switchUser('reservist')
+  // Исправления выполняет резервист явно; подготовка ответа не меняет выплаты.
+  await nav('Выплаты и меры')
+  await category('Страховые выплаты и компенсации')
+  await page.getByLabel('Основание в представленной записи', { exact: true }).selectOption('В связи с родственником')
+  await page.getByRole('button', { name: 'Сохранить и вернуться', exact: true }).click()
+  await category('Единовременные выплаты, связанные со службой')
+  await page.getByRole('button', { name: 'Удалить запись 1', exact: true }).click()
+  await page.getByRole('button', { name: 'Нет', exact: true }).click()
   await nav('Уточнения')
   await page.getByLabel('Пояснение резервиста', { exact: true }).fill('Компенсация 320 000 ₽ получена в связи с отцом, а не за личное участие. Связь с основанием уточнена. Запись Н-42 повторяла надбавку: повтор исключён. Договор П-18/25 и вопрос об уведомлении сверены по учебным основаниям.')
-  for (const checkbox of await page.getByRole('checkbox').all()) await checkbox.check()
+  await expect(page.getByRole('checkbox')).toHaveCount(0)
   await capture('19-reservist-clarification.png')
   await page.getByRole('button', { name: 'Подготовить версию 2', exact: true }).click()
   await send()
-  await page.getByRole('button', { name: 'Проверяющий', exact: true }).click()
+  await switchUser('reviewer')
   await page.getByRole('button', { name: 'Открыть РВ-2026-0147', exact: true }).click()
   await page.getByRole('button', { name: 'Принять к рассмотрению', exact: true }).click()
   await nav('Результат рассмотрения')
   for (const checkbox of await page.getByRole('checkbox').all()) await checkbox.check()
   await page.getByLabel('Реквизиты подтверждающего основания', { exact: true }).fill('Учебный результат АР-0147/26 от 08.11.2026')
   await page.getByLabel('Комментарий к результату', { exact: true }).fill('Версия 2 сопоставлена с представленными учебными документами. Компенсация связана с родственником, повторная запись Н-42 исключена, договор и применимость уведомления рассмотрены. Планируемое жильё и натуральная помощь учтены отдельно. Решение о назначении не принималось.')
-  await page.getByLabel('Подтверждающий документ результата').setInputFiles(demoDocument('Основание_результата_демо.pdf'))
+  await page.getByLabel('Подтверждающий документ результата').setInputFiles(
+    await demoDocument('Основание_результата_демо.pdf', 'Подтверждающий_документ_результата.pdf')
+  )
   await page.getByRole('button', { name: 'Зафиксировать итоговый статус', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Рассмотрение завершено', exact: true })).toBeVisible()
   await capture('20-reviewer-result.png')
@@ -116,12 +159,25 @@ try {
   await download
   await nav('Версии и журнал')
   await capture('21-reviewer-history.png')
-  await page.getByRole('button', { name: 'Резервист', exact: true }).click()
+  await switchUser('reservist')
   await capture('22-reservist-completed.png')
   await page.getByRole('button', { name: 'Инструкция по заполнению', exact: true }).click()
   await capture('23-profile-instructions.png')
+  await nav('Печать анкеты')
+  await expect(page.locator('.fp-print-document')).toContainText('Представленная версия 2')
+  await expect(page.locator('.fp-print-document')).toContainText('1 790 000')
+  await capture('24-whole-profile-print-preview.png')
+  await page.pdf({ path: resolve(output, 'whole-profile-a4.pdf'), format: 'A4', preferCSSPageSize: true, printBackground: true })
+  await nav('Шаблоны и памятки')
+  await page.locator('.fp-template-card').filter({ hasText: 'Лист описания выплаты' }).click()
+  await capture('25-template-payment-sheet.png')
+  await page.pdf({ path: resolve(output, 'template-payment-sheet-a4.pdf'), format: 'A4', preferCSSPageSize: true, printBackground: true })
+  await page.locator('.fp-template-card').filter({ hasText: 'Пустая анкета кандидата' }).click()
+  await page.pdf({ path: resolve(output, 'template-blank-profile-a4.pdf'), format: 'A4', preferCSSPageSize: true, printBackground: true })
+  await page.locator('.fp-template-card').filter({ hasText: 'Памятка по качеству скана' }).click()
+  await page.pdf({ path: resolve(output, 'template-scan-checklist-a4.pdf'), format: 'A4', preferCSSPageSize: true, printBackground: true })
   if (errors.length) throw new Error(errors.join('\n'))
-  console.log(`23 screenshots saved to ${output}`)
+  console.log(`${captures} screenshots and 4 printable PDFs saved to ${output}`)
 } finally {
   await browser.close()
 }

@@ -1,10 +1,13 @@
-.fp-shell {
+.fp-shell,
+.fp-gate {
   --fp-navy: #10283b;
   --fp-teal: #087e78;
   --fp-text: #203347;
   --fp-muted: #5e7183;
   --fp-line: #e0e7ee;
   --fp-bg: #f3f6f9;
+}
+.fp-shell {
   position: relative;
   min-height: 100vh;
   background: var(--fp-bg);
@@ -3615,4 +3618,352 @@
     right: 16px;
     font-size: 11px;
   }
+}
+
+
+/* Общая форма входа через реальные API-роли. */
+.fp-gate {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px 16px;
+  background: var(--fp-bg);
+  font: 14px/1.5 "Segoe UI", Arial, sans-serif;
+  color: var(--fp-text);
+}
+.fp-gate-card {
+  width: 100%;
+  max-width: 440px;
+  background: #fff;
+  border: 1px solid var(--fp-line);
+  border-top: 3px solid var(--fp-teal);
+  border-radius: 12px;
+  padding: 30px;
+  box-shadow: 0 8px 24px #10283b14;
+}
+.fp-gate-card > svg,
+.fp-gate-mark {
+  color: var(--fp-teal);
+}
+.fp-gate-mark {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: #e8f5ef;
+  margin-bottom: 18px;
+}
+.fp-gate h1 {
+  margin: 0 0 8px;
+  font-size: 22px;
+  letter-spacing: -0.4px;
+}
+.fp-gate p {
+  margin: 0 0 22px;
+  color: var(--fp-muted);
+  font-size: 12px;
+}
+.fp-gate form {
+  display: grid;
+  gap: 14px;
+}
+.fp-gate label {
+  display: grid;
+  gap: 6px;
+  color: #415c71;
+  font-size: 12px;
+  font-weight: 600;
+}
+.fp-gate input {
+  border: 1px solid #dce4ec;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font: inherit;
+  font-weight: 400;
+  outline: none;
+}
+.fp-gate input:focus {
+  border-color: var(--fp-teal);
+  box-shadow: 0 0 0 3px #087e781a;
+}
+.fp-gate-error {
+  color: #a0453b;
+  background: #fff4f2;
+  border: 1px solid #f2d7d2;
+  border-radius: 7px;
+  padding: 10px 12px;
+  font-size: 12px;
+}
+.fp-gate button {
+  border: 0;
+  border-radius: 8px;
+  padding: 11px 15px;
+  background: var(--fp-teal);
+  color: #fff;
+  font: inherit;
+  font-weight: 650;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.fp-gate button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.fp-gate form button {
+  width: 100%;
+}
+.fp-gate-demo {
+  margin-top: 24px;
+  border-top: 1px solid var(--fp-line);
+  padding-top: 18px;
+  display: grid;
+  gap: 8px;
+}
+.fp-gate-demo > span {
+  color: var(--fp-muted);
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+.fp-gate-demo button {
+  justify-content: flex-start;
+  text-align: left;
+  background: #f6faf8;
+  color: var(--fp-text);
+  border: 1px solid #dcece4;
+  padding: 10px 12px;
+}
+.fp-gate-demo button:hover {
+  background: #eaf4ef;
+}
+.fp-gate-demo b,
+.fp-gate-demo small {
+  display: block;
+}
+.fp-gate-demo small {
+  color: var(--fp-muted);
+  font-size: 10px;
+  font-weight: 400;
+  margin-top: 2px;
+}
+.fp-gate-footnote {
+  display: block;
+  margin-top: 18px;
+  color: var(--fp-muted);
+  font-size: 10px;
+}
+.fp-api-role {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #eaf4ef;
+  color: #216e5d;
+  font-size: 11px;
+  font-weight: 650;
+}
+.fp-api-role small {
+  color: #6b8d83;
+  font-size: 9px;
+  font-weight: 400;
+}
+@media (max-width: 700px) {
+  .fp-api-role small {
+    display: none;
+  }
+}
+
+
+/* Форма входа: модель закрытого аккаунта размонтирована, данные остаются в API. */
+.fp-gate-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  padding: 24px 16px;
+  overflow: auto;
+  background: #10283bcc;
+  backdrop-filter: blur(3px);
+}
+.fp-gate-overlay .fp-gate-card,
+.fp-gate-card-overlay {
+  max-width: 460px;
+  margin: 0 auto;
+  box-shadow: 0 20px 60px #06131f66;
+}
+
+
+/* Подсказка в очереди проверяющего, когда материал ещё не отправлен. */
+.fp-queue-hint {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.fp-queue-hint > span {
+  flex: 1;
+  min-width: 220px;
+}
+.fp-queue-hint .fp-button {
+  white-space: nowrap;
+  border-color: #c08a2d;
+  color: #8a5a1e;
+  background: #fff;
+}
+
+
+/* Доступность: ссылка пропуска навигации. */
+.fp-skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 8px;
+  z-index: 200;
+  background: #fff;
+  color: var(--fp-teal);
+  padding: 10px 14px;
+  border: 2px solid var(--fp-teal);
+  border-radius: 8px;
+  font-weight: 700;
+}
+.fp-skip-link:focus {
+  left: 260px;
+}
+
+/* CRUD-строки динамических записей. */
+.fp-crud-list {
+  margin-top: 18px;
+  display: grid;
+  gap: 12px;
+}
+.fp-crud-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)) auto;
+  align-items: end;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--fp-line);
+  border-radius: 9px;
+  background: #fbfdfd;
+}
+.fp-crud-row .fp-field {
+  margin-bottom: 0;
+}
+.fp-crud-row > .fp-icon-button {
+  margin-bottom: 2px;
+  color: #b45b52;
+}
+
+/* Просмотр документа. */
+.fp-modal-file {
+  width: min(960px, 94vw);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  padding: 22px;
+}
+.fp-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+.fp-modal-head h2 {
+  font-size: 17px;
+  overflow-wrap: anywhere;
+}
+.fp-file-frame {
+  flex: 1;
+  min-height: 420px;
+  width: 100%;
+  border: 1px solid var(--fp-line);
+  border-radius: 8px;
+  background: #f3f5f7;
+}
+.fp-modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+.fp-screen-content {
+  display: grid;
+  gap: 22px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font: inherit;
+}
+.fp-sync-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--fp-line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--fp-muted);
+  font-size: 12px;
+}
+.fp-sync-bar > div { display: flex; flex-wrap: wrap; gap: 14px; }
+.fp-server-error { overflow-wrap: anywhere; }
+.fp-person-labels > span { overflow-wrap: anywhere; min-width: 0; }
+.fp-version-files, .fp-legacy-details { min-width: 0; margin-top: 14px; }
+.fp-version-files summary, .fp-legacy-details summary { cursor: pointer; font-weight: 600; }
+.fp-version-files > div { margin-top: 12px; }
+.fp-legacy-details { padding: 16px; background: #fff; border: 1px solid var(--fp-line); border-radius: 8px; }
+.fp-legacy-details pre { margin: 12px 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; }
+.fp-record-list {
+  display: grid;
+  gap: 18px;
+  margin: 16px 0;
+}
+.fp-record-editor {
+  padding: 18px;
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--fp-line);
+  border-radius: 9px;
+  background: #fbfdfd;
+}
+.fp-record-editor legend { padding: 0 7px; font-weight: 650; font-size: 12px; color: #476577; }
+.fp-shell .fp-delete-record { color: #a34e47; }
+.fp-document-slot { display: grid; gap: 10px; }
+.fp-document-slot .fp-upload { margin-top: 2px; }
+.fp-file-card { padding: 10px; border: 1px solid var(--fp-line); border-radius: 9px; }
+.fp-file-card-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 5px 0; }
+.fp-document-assessment { display: grid; gap: 7px; flex: 1; min-width: 0; }
+.fp-document-review-form .fp-field { margin: 18px 0; }
+.fp-document-review-actions { display: grid; gap: 12px; }
+.fp-correction-links { display: flex; flex-wrap: wrap; gap: 18px; margin: 18px 0; }
+.fp-shell .fp-icon-button { display: inline-flex; align-items: center; justify-content: center; }
+.fp-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+.fp-scan-preview { width: 100%; min-height: 0; max-height: 65vh; object-fit: contain; }
+.fp-shell .fp-footer-contacts { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 18px; }
+.fp-footer-contacts > div { display: grid; gap: 4px; overflow-wrap: anywhere; }
+.fp-empty-queue { padding: 30px 15px; }
+.fp-empty-records { padding: 8px 0; }
+@media (max-width: 700px) {
+  .fp-skip-link:focus {
+    left: 16px;
+  }
+  .fp-crud-row {
+    grid-template-columns: 1fr;
+  }
+  .fp-file-frame {
+    min-height: 320px;
+  }
+  .fp-shell .fp-footer-contacts { grid-template-columns: 1fr; }
+  .fp-record-editor { padding: 14px 12px; }
+  .fp-file-card-actions { align-items: flex-start; }
+  .fp-page-header { align-items: flex-start; flex-wrap: wrap; }
 }

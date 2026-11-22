@@ -1,0 +1,298 @@
+{
+  "synthetic": true,
+  "design_mockup": true,
+  "profile_id": "РВ-2026-0147",
+  "profile": {
+    "candidate": {
+      "fullName": "Ковалёв Алексей Сергеевич",
+      "birthYear": "1987",
+      "workplace": "Учебный центр «Регион»",
+      "workStatus": "Находится в запасе",
+      "phone": "+7 (000) 000-01-47",
+      "email": "kovalev@reservist.example",
+      "reportingPeriod": "2023–2026",
+      "region": "Липецкая область",
+      "flow": "Первый поток",
+      "programYear": "2024",
+      "regionalProgram": "Герои Липецкой земли",
+      "regionalProgramYear": "2025",
+      "appointmentAuthority": "ОИВ субъекта Российской Федерации",
+      "organizer": "Учебный центр «Резерв»",
+      "diplomaDetails": "ДП-2024-0147 от 20.12.2024",
+      "reserveActDetails": "№ 147-Р от 14.09.2025",
+      "diplomaDocumentId": "sample-diploma",
+      "reserveActDocumentId": "sample-reserve"
+    },
+    "servicePeriods": [
+      {
+        "id": "service-military",
+        "kind": "Военная служба",
+        "category": "Старший офицерский состав",
+        "organization": "Учебное ведомство",
+        "start": "2023-06-01",
+        "end": "2025-08-31"
+      },
+      {
+        "id": "service-work",
+        "kind": "Иное",
+        "category": "Не применяется",
+        "organization": "Учебный центр «Регион»",
+        "start": "2025-09-01",
+        "end": ""
+      }
+    ],
+    "relativeAnswer": "Да",
+    "kinship": {
+      "fullName": "Ковалёв Сергей Петрович",
+      "degree": "Родитель",
+      "status": "Участвовал",
+      "receivedPayments": "Да"
+    },
+    "familyRecipients": [
+      {
+        "id": "recipient-spouse",
+        "fullName": "Ковалёва Мария Андреевна",
+        "relation": "Супруга",
+        "year": "1989"
+      }
+    ],
+    "categoryAnswers": {
+      "0": "Да",
+      "1": "Да",
+      "2": "Да",
+      "3": "Да",
+      "4": "Да",
+      "5": "Нет",
+      "6": "Да",
+      "7": "Да",
+      "8": "Планируется",
+      "9": "Нет"
+    },
+    "supportLevels": {
+      "Федеральный": "Нет",
+      "Региональный": "Да",
+      "Муниципальный": "Нет"
+    },
+    "personalInsuranceAnswer": "Нет",
+    "records": {
+      "0": [
+        {
+          "id": "payment-allowance",
+          "title": "Денежное довольствие",
+          "amount": "1 200 000",
+          "basis": "Приказ о назначении на должность",
+          "periodFrom": "2023-06-01",
+          "periodTo": "2025-08-31",
+          "payer": "Учебное ведомство",
+          "recipient": "Ковалёв Алексей Сергеевич",
+          "documentId": "sample-order"
+        }
+      ],
+      "1": [
+        {
+          "id": "payment-extra",
+          "title": "Дополнительная выплата по назначению Н-42",
+          "amount": "150 000",
+          "basis": "Учебный приказ о назначении · приложение № 2",
+          "periodFrom": "2023-06-01",
+          "periodTo": "2025-08-31",
+          "payer": "Учебное ведомство",
+          "recipient": "Ковалёв Алексей Сергеевич",
+          "assignmentId": "Н-42",
+          "documentId": "sample-order"
+        }
+      ],
+      "2": [
+        {
+          "id": "payment-onetime",
+          "title": "Единовременная выплата по назначению Н-42",
+          "eventKind": "Завершение периода службы",
+          "eventDate": "2025-08-31",
+          "recipientKind": "Сам резервист",
+          "recipient": "Ковалёв Алексей Сергеевич",
+          "amount": "150 000",
+          "payer": "Учебное ведомство",
+          "basis": "Учебный акт № 42 · редакция от 01.06.2025",
+          "periodFrom": "2023-06-01",
+          "periodTo": "2025-08-31",
+          "paymentDate": "2025-09-18",
+          "assignmentId": "Н-42",
+          "documentId": "sample-one-time"
+        }
+      ],
+      "3": [
+        {
+          "id": "payment-support",
+          "level": "Региональный",
+          "authority": "Учебный региональный орган",
+          "title": "Региональная мера поддержки участника",
+          "code": "РМ-17",
+          "paymentDate": "2025-04-11",
+          "recipient": "Ковалёв Алексей Сергеевич",
+          "amount": "120 000",
+          "basis": "Учебное решение № РМ-17",
+          "documentId": ""
+        }
+      ],
+      "4": [
+        {
+          "id": "payment-insurance",
+          "title": "Компенсация по решению органа",
+          "recipientKind": "Резервист за родственника",
+          "recipient": "Ковалёв Алексей Сергеевич",
+          "basisType": "За личное участие",
+          "basis": "Решение № К-24 от 24.04.2025",
+          "paymentDate": "2025-04-30",
+          "periodFrom": "2025-04-01",
+          "periodTo": "2025-04-30",
+          "amount": "320 000",
+          "documentId": "sample-insurance"
+        }
+      ],
+      "5": [],
+      "6": [
+        {
+          "id": "payment-family",
+          "title": "Выплата супруге за кандидата в резерв",
+          "recipientId": "recipient-spouse",
+          "amount": "120 000",
+          "basis": "Учебное решение о выплате члену семьи",
+          "paymentDate": "2025-05-12",
+          "documentId": "sample-family"
+        }
+      ],
+      "7": [
+        {
+          "id": "payment-aid",
+          "title": "Помощь для учебной и экспертной деятельности",
+          "form": "Натуральная",
+          "organization": "Учебный фонд «Поддержка»",
+          "recipient": "Ковалёв Алексей Сергеевич",
+          "description": "Ноутбук для учебной деятельности",
+          "basis": "Учебное письмо фонда № Ф-12",
+          "documentId": "sample-aid"
+        }
+      ],
+      "8": [
+        {
+          "id": "payment-housing",
+          "expectedYear": "",
+          "title": "В очереди · получение планируется",
+          "basis": "Учебное решение № Ж-09 от 31.10.2026",
+          "housingKind": "Субсидия",
+          "decisionDate": "2024-10-02",
+          "acquisitionDate": "2024-11-12",
+          "documentId": "sample-housing"
+        }
+      ],
+      "9": []
+    },
+    "activityAnswer": "Да",
+    "activities": [
+      {
+        "id": "activity-teaching",
+        "organization": "Учебный университет",
+        "kind": "Преподавание",
+        "engagement": "Гражданско-правовой договор",
+        "periodFrom": "2025-04-01",
+        "periodTo": "2025-06-30",
+        "basis": "Договор № П-18/25 от 24.03.2025",
+        "documentId": "sample-activity"
+      }
+    ],
+    "attachments": [
+      {
+        "id": "sample-diploma",
+        "name": "Диплом_переподготовка.pdf",
+        "url": "/samples/Диплом_переподготовка.pdf",
+        "size": 848,
+        "format": "pdf",
+        "section": "Программа «Время героев»",
+        "kind": "basis",
+        "origin": "sample"
+      },
+      {
+        "id": "sample-reserve",
+        "name": "Акт_включение_в_резерв.pdf",
+        "url": "/samples/Акт_включение_в_резерв.pdf",
+        "size": 858,
+        "format": "pdf",
+        "section": "Акт о включении в резерв",
+        "kind": "basis",
+        "origin": "sample"
+      },
+      {
+        "id": "sample-order",
+        "name": "Приказ_назначение.pdf",
+        "url": "/samples/Приказ_назначение.pdf",
+        "size": 839,
+        "format": "pdf",
+        "section": "Довольствие и надбавки",
+        "kind": "basis",
+        "origin": "sample"
+      },
+      {
+        "id": "sample-one-time",
+        "name": "Приказ_единовременная.pdf",
+        "url": "/samples/Приказ_единовременная.pdf",
+        "size": 842,
+        "format": "pdf",
+        "section": "Единовременная выплата · при наличии",
+        "kind": "basis",
+        "origin": "sample"
+      },
+      {
+        "id": "sample-insurance",
+        "name": "Решение_компенсация.pdf",
+        "url": "/samples/Решение_компенсация.pdf",
+        "size": 858,
+        "format": "pdf",
+        "section": "Выплата за родственника",
+        "kind": "basis",
+        "origin": "sample"
+      },
+      {
+        "id": "sample-family",
+        "name": "Решение_члену_семьи.pdf",
+        "url": "/samples/Решение_члену_семьи.pdf",
+        "size": 848,
+        "format": "pdf",
+        "section": "Выплата члену семьи",
+        "kind": "basis",
+        "origin": "sample"
+      },
+      {
+        "id": "sample-aid",
+        "name": "Письмо_фонда.pdf",
+        "url": "/samples/Письмо_фонда.pdf",
+        "size": 832,
+        "format": "pdf",
+        "section": "Материальная помощь",
+        "kind": "basis",
+        "origin": "sample"
+      },
+      {
+        "id": "sample-housing",
+        "name": "Решение_жилищная_очередь.pdf",
+        "url": "/samples/Решение_жилищная_очередь.pdf",
+        "size": 861,
+        "format": "pdf",
+        "section": "Жилищная мера",
+        "kind": "basis",
+        "origin": "sample"
+      },
+      {
+        "id": "sample-activity",
+        "name": "Договор_преподавание.pdf",
+        "url": "/samples/Договор_преподавание.pdf",
+        "size": 848,
+        "format": "pdf",
+        "section": "Дополнительная деятельность",
+        "kind": "basis",
+        "origin": "sample"
+      }
+    ],
+    "consentDocumentId": "",
+    "photo": null
+  }
+}

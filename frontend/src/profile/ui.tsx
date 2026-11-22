@@ -1,9 +1,10 @@
-import type { CSSProperties, ReactNode } from 'react'
+import { useId, useState, type CSSProperties, type ReactNode } from 'react'
 import {
   CalendarDays,
   Check,
   ChevronRight,
   FileText,
+  Download,
   Info,
   Landmark,
   Mail,
@@ -13,8 +14,8 @@ import {
   Upload,
   AlertCircle
 } from 'lucide-react'
-import type { Tone, CandidateDetails } from './types'
-import { person, profileId } from './data'
+import type { Tone, CandidateDetails, Attachment } from './types'
+import { checkFile } from './documents'
 
 export function Badge({ children, tone = 'neutral' }: { children: ReactNode; tone?: Tone }) {
   return <span className={`fp-badge fp-badge-${tone}`}>{children}</span>
@@ -74,7 +75,7 @@ export function Field({
 }: {
   label: string
   value?: string
-  options?: string[]
+  options?: (string | { value: string; label: string })[]
   required?: boolean
   optional?: boolean
   error?: string
@@ -83,6 +84,7 @@ export function Field({
   onChange?: (value: string) => void
   type?: string
 }) {
+  const id = useId()
   return (
     <label className={`fp-field ${wide ? 'fp-field-wide' : ''} ${error ? 'fp-field-error' : ''}`}>
       <span className="fp-field-label">
@@ -92,32 +94,45 @@ export function Field({
       </span>
       {options ? (
         <select
+          id={id}
           aria-label={label}
-          {...(onChange ? { value } : { defaultValue: value })}
+          value={value}
+          disabled={!onChange}
+          aria-required={required}
+          aria-invalid={!!error}
+          aria-describedby={error || hint ? `${id}-help` : undefined}
           onChange={(e) => onChange?.(e.target.value)}
         >
+          {!value && <option value="" disabled>Выберите значение</option>}
+          {value && !options.some((option) => (typeof option === 'string' ? option : option.value) === value) && <option value={value}>Сохранённое значение: {value}</option>}
           {options.map((option) => (
-            <option key={option}>{option}</option>
+            <option key={typeof option === 'string' ? option : option.value} value={typeof option === 'string' ? option : option.value}>
+              {typeof option === 'string' ? option : option.label}
+            </option>
           ))}
         </select>
       ) : onChange ? (
         <input
+          id={id}
           aria-label={label}
           type={type}
+          maxLength={4000}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           aria-invalid={!!error}
+          aria-required={required}
+          aria-describedby={error || hint ? `${id}-help` : undefined}
         />
       ) : (
-        <input aria-label={label} type={type} defaultValue={value} />
+        <input id={id} aria-label={label} type={type} value={value} readOnly aria-required={required} />
       )}
       {error && (
-        <span className="fp-field-feedback">
+        <span id={`${id}-help`} className="fp-field-feedback">
           <AlertCircle size={13} />
           {error}
         </span>
       )}
-      {hint && !error && <small className="fp-field-hint">{hint}</small>}
+      {hint && !error && <small id={`${id}-help`} className="fp-field-hint">{hint}</small>}
     </label>
   )
 }
@@ -139,6 +154,7 @@ export function Choice({
           aria-pressed={answer === value}
           className={answer === value ? 'active' : ''}
           onClick={() => onChange?.(answer)}
+          disabled={!onChange}
         >
           {answer === value && <Check size={14} />}
           {answer}
@@ -151,12 +167,16 @@ export function FileRow({
   name,
   note = 'Учебный документ · PDF',
   required = false,
-  onPreview
+  onPreview,
+  url,
+  onDownload
 }: {
   name: string
   note?: string
   required?: boolean
-  onPreview?: (name: string) => void
+  onPreview?: (name: string, url?: string) => void
+  url?: string
+  onDownload?: (name: string) => void
 }) {
   return (
     <div className="fp-file">
@@ -170,15 +190,18 @@ export function FileRow({
           {required && ' · обязательное основание'}
         </small>
       </div>
-      <Badge tone="teal">
-        <Check size={13} />
-        Добавлен
+      <Badge tone={url ? 'teal' : 'amber'}>
+        {url && <Check size={13} />}
+        {url ? 'Добавлен' : 'Оригинал недоступен'}
       </Badge>
       {onPreview && (
-        <button className="fp-icon-button" aria-label={`Просмотреть ${name}`} onClick={() => onPreview(name)}>
+        <button className="fp-icon-button" aria-label={`Просмотреть ${name}`} onClick={() => onPreview(name, url)}>
           <ChevronRight size={17} />
         </button>
       )}
+      {url && <a className="fp-icon-button" aria-label={`Скачать ${name}`} href={downloadUrl(url)} download={name} onClick={() => onDownload?.(name)}>
+        <Download size={16} />
+      </a>}
     </div>
   )
 }
@@ -186,37 +209,57 @@ export function UploadBox({
   label,
   error,
   optional = false,
-  onUpload
+  onUpload,
+  mode = 'basis'
 }: {
   label: string
   error?: boolean
   optional?: boolean
-  onUpload?: (name: string) => void
+  onUpload?: (name: string, file?: File) => void | Promise<unknown>
+  mode?: 'basis' | 'scan' | 'photo'
 }) {
+  const [fileError, setFileError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const id = useId()
+  const formats = mode === 'basis' ? 'PDF, DOCX' : mode === 'photo' ? 'PNG, JPG' : 'PDF, PNG, JPG'
   return (
-    <label className={`fp-upload ${error ? 'fp-upload-error' : ''}`}>
+    <label className={`fp-upload ${error || fileError ? 'fp-upload-error' : ''}`}>
       <span className="fp-upload-icon">
         <Upload size={22} />
       </span>
       <div>
         <strong>{label}</strong>
         <small>
-          {optional ? 'При наличии · не блокирует отправку' : 'НПА, решение, договор или справка органа'} ·
-          PDF, DOCX
+          {mode === 'scan' ? 'Подписанный скан согласия' : mode === 'photo' ? 'Необязательно · без распознавания лиц'
+            : optional ? 'При наличии · не блокирует отправку' : 'НПА, решение, договор или справка органа'} · {formats} · до 5 МБ
         </small>
-        {error && <span className="fp-field-feedback">Прикрепите документ-основание</span>}
+        {(fileError || error) && <span id={`${id}-error`} className="fp-field-feedback" role={fileError ? 'alert' : undefined}>
+          {fileError || 'Прикрепите обязательный документ'}
+        </span>}
       </div>
       <span className="fp-button fp-button-outline">
         <Paperclip size={15} />
-        Выбрать файл
+        {busy ? 'Проверяем и загружаем…' : 'Выбрать файл'}
       </span>
       <input
         type="file"
         aria-label={label}
-        accept=".pdf,.doc,.docx"
-        onChange={(e) => {
+        aria-describedby={fileError || error ? `${id}-error` : undefined}
+        aria-invalid={!!fileError}
+        disabled={busy || !onUpload}
+        accept={mode === 'basis' ? '.pdf,.docx' : mode === 'photo' ? '.png,.jpg,.jpeg' : '.pdf,.png,.jpg,.jpeg'}
+        onChange={async (e) => {
           const file = e.target.files?.[0]
-          if (file) onUpload?.(file.name)
+          e.target.value = ''
+          if (!file) return
+          setFileError('')
+          setBusy(true)
+          try {
+            const problem = await checkFile(file, mode)
+            if (problem) setFileError(problem)
+            else await onUpload?.(file.name, file)
+          } catch (failure) { setFileError(failure instanceof Error ? failure.message : 'Загрузка не подтверждена сервером') }
+          finally { setBusy(false) }
         }}
       />
     </label>
@@ -249,7 +292,9 @@ export function PersonHeader({
   version,
   details,
   children,
-  progress
+  progress,
+  photo,
+  profileId = ''
 }: {
   status: string
   tone: Tone
@@ -257,19 +302,23 @@ export function PersonHeader({
   details: CandidateDetails
   children?: ReactNode
   progress?: number
+  photo?: Attachment | null
+  profileId?: string
 }) {
   return (
     <Panel className="fp-person-header">
       <div className="fp-person-identity">
-        <div className="fp-avatar fp-avatar-large">АК</div>
+        <div className="fp-avatar fp-avatar-large">
+          {photo?.url ? <img src={photo.url} alt={`Фото ${details.fullName}`} /> : details.fullName.split(/\s+/).slice(0, 2).map((word) => word[0]).join('')}
+        </div>
         <div className="fp-person-copy">
           <div className="fp-person-labels">
             <Badge tone={tone}>{status}</Badge>
             <span>
-              {profileId} · {version}
+              {profileId && `${profileId} · `}{version}
             </span>
           </div>
-          <h2>{person}</h2>
+          <h2>{details.fullName || 'ФИО не указано'}</h2>
           <p className="fp-person-program">
             «Время героев» · {details.flow.toLowerCase()} · {details.programYear}
           </p>
@@ -289,7 +338,7 @@ export function PersonHeader({
             </span>
             <span>
               <ShieldCheck size={15} />
-              Находится в запасе
+              {details.workStatus || 'Статус работы не указан'}
             </span>
           </div>
           <div className="fp-person-contacts">
@@ -312,4 +361,8 @@ export function PersonHeader({
       )}
     </Panel>
   )
+}
+
+export function downloadUrl(url: string): string {
+  return url.startsWith('/api/') ? `${url}${url.includes('?') ? '&' : '?'}download=true` : url
 }

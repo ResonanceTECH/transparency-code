@@ -46,22 +46,6 @@ test('profile: reservist publishes draft, reviewer requests clarification', asyn
   await page.getByLabel('Пароль').fill('resonance-demo-2026')
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
   await expect(page.getByText('ФИНАНСОВЫЙ ПРОФИЛЬ')).toBeVisible()
-  // Профиль живёт между прогонами: если он на рассмотрении (поля заблокированы),
-  // проверяющий сначала возвращает его в «уточнение» — цикл восстанавливается.
-  if (!(await page.getByRole('button', { name: 'Сохранить черновик' }).isVisible())) {
-    await page.getByRole('button', { name: 'Выйти' }).click()
-    await page.getByLabel('Логин').fill('reviewer')
-    await page.getByLabel('Пароль').fill('resonance-demo-2026')
-    await page.getByRole('button', { name: 'Войти', exact: true }).click()
-    await page.getByText('Е2Е Тестовая Кандидатка').click()
-    await page.getByLabel('Комментарий (обязателен, ≥ 5 символов)').fill('Продолжаем проверку: требуется уточнение')
-    await page.getByRole('button', { name: 'Требуются уточнения' }).click()
-    await page.getByRole('button', { name: 'Выйти' }).click()
-    await page.getByLabel('Логин').fill('reservist')
-    await page.getByLabel('Пароль').fill('resonance-demo-2026')
-    await page.getByRole('button', { name: 'Войти', exact: true }).click()
-    await expect(page.getByRole('button', { name: 'Сохранить черновик' })).toBeVisible()
-  }
   // Анкета и поток (веха 10%) — селекторы привязаны к панели: у родственника тоже есть «ФИО»
   const anketa = page.locator('section.panel', { hasText: 'Анкета и поток' })
   await anketa.getByLabel('ФИО').fill('Е2Е Тестовая Кандидатка')
@@ -93,7 +77,8 @@ test('profile: reservist publishes draft, reviewer requests clarification', asyn
   // Ответы по всем категориям выплат (веха 70%) — «Нет»
   const paymentsPanel = page.locator('.panel', { hasText: 'Выплаты и меры поддержки' })
   const answerSelects = paymentsPanel.locator('select')
-  for (let i = 0; i < await answerSelects.count(); i++) {
+  await expect(answerSelects).toHaveCount(10)
+  for (let i = 0; i < 10; i++) {
     await answerSelects.nth(i).selectOption('no')
   }
   // Диплом (веха 30%)
@@ -116,32 +101,37 @@ test('profile: reservist publishes draft, reviewer requests clarification', asyn
   // Решение: уточнение — резервист получает вопрос
   await page.getByLabel('Комментарий (обязателен, ≥ 5 символов)').fill('Уточните записи о выплатах родственникам')
   await page.getByRole('button', { name: 'Требуются уточнения' }).click()
-  await expect(page.getByText('ТРЕБУЕТСЯ УТОЧНЕНИЕ').first()).toBeVisible()
+  await expect(page.getByText('ТРЕБУЕТСЯ УТОЧНЕНИЕ')).toBeVisible()
   // Резервист видит вопрос и статус
   await page.getByRole('button', { name: 'Выйти' }).click()
   await page.getByLabel('Логин').fill('reservist')
   await page.getByLabel('Пароль').fill('resonance-demo-2026')
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
-  await expect(page.getByText('ТРЕБУЕТСЯ УТОЧНЕНИЕ').first()).toBeVisible()
+  await expect(page.getByText('ТРЕБУЕТСЯ УТОЧНЕНИЕ')).toBeVisible()
   await expect(page.getByText('Уточните записи о выплатах родственникам').first()).toBeVisible()
-  // Причина уточнения визуально выделена в шапке профиля
-  await expect(page.getByText('Требуется уточнение.').first()).toBeVisible()
-  // Резервист правит черновик и представляет новую версию
-  await anketa.getByLabel('Телефон').fill('+7 900 111-11-11')
+  await expect(page.locator('.clarification-reason')).toContainText('Уточните записи о выплатах родственникам')
+  // Резервист правит телефон и публикует версию 2
+  const phone = page.locator('section.panel', { hasText: 'Анкета и поток' }).getByLabel('Телефон')
+  await phone.fill('+7 900 111-22-33')
+  await expect(phone).toHaveValue('+7 900 111-22-33')
   await page.getByRole('button', { name: 'Сохранить черновик' }).click()
+  await expect(page.getByText('Черновик сохранён')).toBeVisible()
   await page.getByRole('button', { name: 'Представить сведения' }).click()
-  await expect(page.getByText(/Изменено в версии \d+/).first()).toBeVisible()
-  await expect(page.getByText('person.phone').first()).toBeVisible()
-  // Проверяющий видит сравнение версий и переключается между ними
+  await expect(page.getByText(/Версия 2/).first()).toBeVisible()
+  await page.getByRole('button', { name: 'Сравнить' }).click()
+  await expect(page.getByText('Что изменилось между версиями', { exact: true })).toBeVisible()
+  await expect(page.getByText(/изменено полей/)).toBeVisible()
+  // Проверяющий видит обе версии, сравнение и печатную форму
   await page.getByRole('button', { name: 'Выйти' }).click()
   await page.getByLabel('Логин').fill('reviewer')
   await page.getByLabel('Пароль').fill('resonance-demo-2026')
   await page.getByRole('button', { name: 'Войти', exact: true }).click()
   await page.getByText('Е2Е Тестовая Кандидатка').click()
-  await expect(page.getByText(/Что изменилось: версия \d+ → \d+/)).toBeVisible()
-  await expect(page.getByText('person.phone').first()).toBeVisible()
-  await page.getByLabel('Выбор версии').selectOption({ index: 0 })
-  await expect(page.getByText(/ВЕРСИЯ \d+/).first()).toBeVisible()
+  await expect(page.getByRole('combobox', { name: 'Версия' })).toHaveCount(1)
+  await page.getByRole('button', { name: 'Сравнить последние версии' }).click()
+  await expect(page.getByText('Изменения между версиями', { exact: true })).toBeVisible()
+  await expect(page.getByText(/изменено полей/)).toBeVisible()
+  await expect(page.locator('.print-report')).toContainText('Сведения о доходах')
   expect(errors).toEqual([])
 })
 
