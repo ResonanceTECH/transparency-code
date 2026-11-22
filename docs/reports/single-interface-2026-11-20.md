@@ -29,4 +29,4 @@ Backend, миграция `c72f6a904e11`, контракт `questionnaire-v1`, �
 
 Тесты запускались. Backend-тесты адаптированы под текущий API: `70 passed / 0 failed`, включая новый набор `backend/tests/test_persistent_profile_contract.py` (7/7); прежние версии сохранены в `backend/tests/archive/`. Playwright/capture/CI остаются устаревшими: все падения связаны со старыми ожиданиями in-memory UI; `frontend/tests/flow.spec.ts` и e2e-workflow описывают удалённый интерфейс. [Разбор результатов](test-run-2026-11-20.md).
 
-[Запуск](../../README.md) · [Текст для Дарьи](../../DARIA-HANDOFF.md) · [API и миграция](api-integration-2026-11-20.md).
+[Запуск](../../README.md) · [Текст для Дарьи](archive/DARIA-HANDOFF.md) · [API и миграция](api-integration-2026-11-20.md).
