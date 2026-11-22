@@ -1,0 +1,7 @@
+# HTTPS для сервера через nip.io и Caddy.
+# nip.io поддомен резолвится в IP из имени без настройки DNS,
+# сертификат Let's Encrypt Caddy выпускает и продлевает сам.
+# Свой домен позже задается переменной TLS_DOMAIN в .env.
+{$TLS_DOMAIN:135.106.155.218.nip.io} {
+	reverse_proxy frontend:80
+}
