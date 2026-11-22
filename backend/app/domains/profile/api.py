@@ -41,6 +41,7 @@ from app.domains.profile.files import (
     validate_file,
 )
 from app.domains.profile.models import (
+    PAYMENT_CATEGORIES,
     AuditScope,
     ProfileDocument,
     ProfileStatus,
@@ -118,6 +119,7 @@ async def require_reviewer(user: User = Depends(get_current_user),
 
 
 def _draft_out(profile) -> DraftOut:
+    blocks_by_cat = {b.category: b for b in profile.payment_blocks}
     return DraftOut(
         profile_id=profile.id,
         status=profile.status,
@@ -151,9 +153,13 @@ def _draft_out(profile) -> DraftOut:
              "participant_status": r.participant_status}
             for r in profile.relatives
         ],
+        # Блоки всех категорий отдаются всегда: на чистом профиле строк ещё нет
+        # (иначе can_load_demo сломается), но клиенту нужны селекты ответов —
+        # недостающие категории синтезируются пустыми на лету.
         payments=[
             PaymentBlockOut(
-                category=b.category, answer=b.answer,
+                category=cat,
+                answer=(b.answer if (b := blocks_by_cat.get(cat)) else None),
                 records=[
                     {"id": r.id, "recipient_kind": r.recipient_kind,
                      "recipient_name": r.recipient_name,
@@ -165,9 +171,9 @@ def _draft_out(profile) -> DraftOut:
                      "payment_date": r.payment_date, "event_date": r.event_date,
                      "housing_kind": r.housing_kind, "document_ref": r.document_ref,
                      "document_id": r.document_id, "extra": r.extra or {}}
-                    for r in b.records
+                    for r in (b.records if b else [])
                 ])
-            for b in profile.payment_blocks
+            for cat in PAYMENT_CATEGORIES
         ],
         activity_participates=profile.activity_participates,
         activities=[
