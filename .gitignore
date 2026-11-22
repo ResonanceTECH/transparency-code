@@ -9,6 +9,8 @@ build/
 test-results/
 playwright-report/
 coverage/
+.pw-stack/
+uploads/
 
 # Local environment & secrets
 .env

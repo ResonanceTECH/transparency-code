@@ -56,7 +56,7 @@ docker compose up -d --build --wait
 
 ### Вручную, без Docker
 
-Нужны Python 3.12+, Node 22+ и npm 10+. Backend поднимается на SQLite, применяются те же миграции.
+Нужны Python 3.12+, Node 22+ и npm 10+. Ниже backend поднимается на SQLite для простоты. При установленной локально PostgreSQL вместо этого `DATABASE_URL` задают как `postgresql+asyncpg://postgres@localhost:5432/resonance`, миграции и учебные сиды отработают одинаково.
 
 ```bash
 cd backend
@@ -110,11 +110,11 @@ npm run dev
 | Миграции | `.venv/bin/python -m alembic check` | схема совпадает с миграциями |
 | TypeScript | `cd frontend && npm run typecheck` | чисто |
 | Сборка клиента | `npm run build` | собирается |
-| Playwright профиля | `npm run test:prototype` | 2 passed, 21 failed |
-| Playwright visual | `npm run test:visual` | 0 passed, 4 failed |
-| Playwright e2e | `npm run test:e2e` | 0 passed, 5 failed, нужен стек на порту 8080 |
+| Playwright профиля | `npm run test:prototype` | 13 passed, 0 failed |
+| Playwright visual | `npm run test:visual` | 4 passed, 0 failed |
+| Playwright e2e | `npm run test:e2e` | 2 passed, 0 failed, стек поднимается автоматически |
 
-Backend-тесты покрывают авторизацию, дела, документы, детерминированный анализ и весь контур профиля на изолированной базе в памяти. Падающие сценарии Playwright относятся к прежнему макету в памяти и к удаленному интерфейсу дел, к текущей API-модели они не адаптированы и не входят в критерии приемки. Подробный разбор в [отчете о прогоне](docs/reports/test-run-2026-11-20.md), покрытие backend-тестов в [backend/README.md](backend/README.md).
+Backend-тесты покрывают авторизацию, дела, документы, детерминированный анализ и весь контур профиля на изолированной базе в памяти. Каждый Playwright-набор сам поднимает изолированный backend на SQLite с учебными аккаунтами и миграциями и гоняет сценарии по живому API без моков, заранее запускать ничего не нужно. Покрытие backend-тестов в [backend/README.md](backend/README.md), устройство испытательного стека в [frontend/README.md](frontend/README.md).
 
 ## Ограничения
 
