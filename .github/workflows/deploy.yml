@@ -27,17 +27,31 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check deploy secrets
+        id: guard
+        run: |
+          if [ -z "$DEPLOY_HOST" ] || [ -z "$DEPLOY_USER" ] || [ -z "$DEPLOY_SSH_KEY" ]; then
+            echo "::notice::Секреты деплоя не заданы (DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY), пропускаем"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Setup SSH
+        if: steps.guard.outputs.skip != 'true'
         run: |
           mkdir -p ~/.ssh
           install -m 600 /dev/null ~/.ssh/deploy_key
-          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
-          ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+          echo "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
 
       - name: Sync sources to server
+        if: steps.guard.outputs.skip != 'true'
         run: |
           rsync -az --delete \
             --exclude .git --exclude .github --exclude node_modules \
@@ -45,10 +59,11 @@ jobs:
             --exclude .env --exclude uploads --exclude .venv \
             --exclude __pycache__ --exclude .DS_Store \
             -e "ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes" \
-            ./ "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/root/transparency-code/"
+            ./ "$DEPLOY_USER@$DEPLOY_HOST:/root/transparency-code/"
 
       - name: Rebuild and restart stack
+        if: steps.guard.outputs.skip != 'true'
         run: |
           ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes \
-            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
             "cd /root/transparency-code && sed -i '/^HTTP_PORT=/d' .env && echo 'HTTP_PORT=8080' >> .env && docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d --build && curl -fsS --retry 15 --retry-delay 4 https://135.106.155.218.nip.io/api/health"
