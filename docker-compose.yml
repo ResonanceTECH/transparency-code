@@ -22,6 +22,9 @@ services:
       SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env (see .env.example)}
       ENVIRONMENT: production
       ALLOW_DEMO_LOGIN: "true"
+      # Стек отдается по http без TLS, флаг Secure на cookie бы заблокировал сессии.
+      # При появлении HTTPS-прокси поставить COOKIE_SECURE=true в .env.
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
       UPLOAD_DIR: /app/uploads
     volumes:
       - uploads:/app/uploads

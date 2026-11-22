@@ -67,6 +67,8 @@ docker compose up -d --build --wait
 
 Интерфейс открывается на порту `HTTP_PORT` из `.env`, по умолчанию 80. Например при `HTTP_PORT=8080` адрес `http://localhost:8080/`, Swagger на `/docs/`. Миграции применяются при старте backend. Тома `pgdata` и `uploads` хранят базу и оригиналы, при обновлении их удалять не нужно, `docker compose down -v` не использовать.
 
+Стек отдается по `http://` без TLS, поэтому compose ставит `COOKIE_SECURE=false`, иначе браузер не отправил бы сессионную cookie и вход не сработал бы. При появлении домена с HTTPS вернуть `COOKIE_SECURE=true` в `.env`.
+
 ### Вручную, без Docker
 
 Нужны Python 3.12+, Node 22+ и npm 10+. Ниже backend поднимается на SQLite для простоты. При установленной локально PostgreSQL вместо этого `DATABASE_URL` задают как `postgresql+asyncpg://postgres@localhost:5432/resonance`, миграции и учебные сиды отработают одинаково.
