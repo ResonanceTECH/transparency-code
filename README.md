@@ -56,6 +56,8 @@ git clone https://github.com/ResonanceTECH/transparency-code.git
 cd transparency-code
 ```
 
+Либо скачать архив исходников из раздела Releases, распаковать его и перейти в распакованную папку. Файлы те же самые, дальше шаги одинаковые.
+
 ### Docker, весь стек одной командой
 
 Нужны Docker и Docker Compose. Скопировать `.env.example` в `.env` и заполнить `POSTGRES_PASSWORD` и `SECRET_KEY`, существующий `.env` не перезаписывать.
